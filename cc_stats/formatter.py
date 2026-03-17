@@ -57,7 +57,9 @@ def format_stats(stats: SessionStats, session_count: int = 1) -> str:
     if session_count > 1:
         lines.append(f"  会话数: {session_count}")
     if stats.start_time:
-        lines.append(f"  时间范围: {stats.start_time.strftime('%Y-%m-%d %H:%M')} ~ {stats.end_time.strftime('%Y-%m-%d %H:%M') if stats.end_time else '?'}")
+        start_local = stats.start_time.astimezone()
+        end_local = stats.end_time.astimezone() if stats.end_time else None
+        lines.append(f"  时间范围: {start_local.strftime('%Y-%m-%d %H:%M')} ~ {end_local.strftime('%Y-%m-%d %H:%M') if end_local else '?'}")
     lines.append("")
 
     # ---- 1. 用户指令数 ----
