@@ -183,10 +183,10 @@ class StatusBarController {
         let event = NSApp.currentEvent
         if event?.type == .rightMouseUp {
             let menu = NSMenu()
-            menu.addItem(NSMenuItem(title: "显示仪表盘", action: #selector(showDashboard), keyEquivalent: ""))
-            menu.addItem(NSMenuItem(title: "显示对话", action: #selector(showChat), keyEquivalent: ""))
+            menu.addItem(NSMenuItem(title: L10n.showDashboard, action: #selector(showDashboard), keyEquivalent: ""))
+            menu.addItem(NSMenuItem(title: L10n.showChat, action: #selector(showChat), keyEquivalent: ""))
             menu.addItem(NSMenuItem.separator())
-            menu.addItem(NSMenuItem(title: "退出", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+            menu.addItem(NSMenuItem(title: L10n.quit, action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
             for item in menu.items { item.target = self }
             statusItem.menu = menu
             statusItem.button?.performClick(nil)

@@ -82,6 +82,8 @@ cc-stats sailor --since 2026-03-13T10:00               # 精确到分钟
 
 在 macOS 状态栏常驻 Claude logo 图标 + 当日 Token 用量，点击图标打开可视化统计面板。
 
+<img src="docs/screenshot.png" width="420" alt="CC Stats Dashboard">
+
 > 前置条件：macOS + Xcode Command Line Tools（`xcode-select --install`）。Swift 菜单栏组件在首次启动时自动编译。
 
 ```bash

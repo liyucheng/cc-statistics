@@ -106,7 +106,7 @@ struct DashboardView: View {
                     viewModel.selectProject(nil)
                 } label: {
                     HStack {
-                        Text("所有项目")
+                        Text(L10n.allProjects)
                         if viewModel.selectedProject == nil {
                             Image(systemName: "checkmark")
                         }
@@ -130,7 +130,7 @@ struct DashboardView: View {
                     Image(systemName: "folder.fill")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundColor(Theme.cyan)
-                    Text(viewModel.selectedProject?.name ?? "所有项目")
+                    Text(viewModel.selectedProject?.name ?? L10n.allProjects)
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(Theme.textPrimary)
                         .lineLimit(1)
@@ -210,25 +210,25 @@ struct DashboardView: View {
         HStack(spacing: 8) {
             StatCard(
                 icon: "terminal.fill",
-                title: "会话",
+                title: L10n.sessions,
                 value: "\(stats.sessionCount)",
                 accentColor: Theme.cyan
             )
             StatCard(
                 icon: "text.bubble.fill",
-                title: "指令",
+                title: L10n.instructions,
                 value: "\(stats.userInstructions)",
                 accentColor: Theme.purple
             )
             StatCard(
                 icon: "clock.fill",
-                title: "时长",
+                title: L10n.duration,
                 value: formatDuration(stats.totalDuration),
                 accentColor: Theme.green
             )
             StatCard(
                 icon: "circlebadge.2.fill",
-                title: "Token",
+                title: L10n.token,
                 value: formatTokens(stats.totalTokens),
                 accentColor: Theme.amber
             )
@@ -240,7 +240,7 @@ struct DashboardView: View {
     private func toolCallsSection(stats: SessionStats) -> some View {
         GlassCard {
             VStack(alignment: .leading, spacing: 8) {
-                SectionHeader(icon: "hammer.fill", title: "工具调用", accentColor: Theme.cyan)
+                SectionHeader(icon: "hammer.fill", title: L10n.toolCalls, accentColor: Theme.cyan)
 
                 let sortedTools = stats.toolCalls
                     .sorted(by: { $0.value > $1.value })
@@ -267,7 +267,7 @@ struct DashboardView: View {
     private func developmentTimeSection(stats: SessionStats) -> some View {
         GlassCard {
             VStack(alignment: .leading, spacing: 10) {
-                SectionHeader(icon: "chart.pie.fill", title: "开发时间", accentColor: Theme.green)
+                SectionHeader(icon: "chart.pie.fill", title: L10n.devTime, accentColor: Theme.green)
 
                 HStack(spacing: 20) {
                     // Activity ring: AI processing / active time (AI + user)
@@ -281,14 +281,14 @@ struct DashboardView: View {
                         lineWidth: 8,
                         size: 90,
                         gradientColors: [Theme.cyan, Theme.purple],
-                        label: "AI 占比"
+                        label: L10n.aiRatio
                     )
 
                     // Time breakdown
                     VStack(spacing: 8) {
                         TimeBreakdownRow(
                             icon: "clock.fill",
-                            label: "总时间",
+                            label: L10n.totalTime,
                             value: formatDuration(stats.totalDuration),
                             color: Theme.cyan
                         )
@@ -296,7 +296,7 @@ struct DashboardView: View {
                             .background(Theme.border)
                         TimeBreakdownRow(
                             icon: "cpu",
-                            label: "AI 处理",
+                            label: L10n.aiProcessing,
                             value: formatDuration(stats.aiProcessingTime),
                             color: Theme.purple
                         )
@@ -304,7 +304,7 @@ struct DashboardView: View {
                             .background(Theme.border)
                         TimeBreakdownRow(
                             icon: "person.fill",
-                            label: "用户活跃",
+                            label: L10n.userActive,
                             value: formatDuration(stats.userActiveTime),
                             color: Theme.green
                         )
@@ -321,7 +321,7 @@ struct DashboardView: View {
         GlassCard {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    SectionHeader(icon: "chevron.left.forwardslash.chevron.right", title: "代码变更", accentColor: Theme.pink)
+                    SectionHeader(icon: "chevron.left.forwardslash.chevron.right", title: L10n.codeChanges, accentColor: Theme.pink)
                     Spacer()
                     let totalAdd = stats.gitAdditions + stats.codeChanges.reduce(0) { $0 + $1.additions }
                     let totalDel = stats.gitDeletions + stats.codeChanges.reduce(0) { $0 + $1.deletions }
@@ -340,7 +340,7 @@ struct DashboardView: View {
                         Image(systemName: "arrow.triangle.branch")
                             .font(.system(size: 9))
                             .foregroundColor(Theme.textTertiary)
-                        Text("\(stats.gitCommits) 次提交")
+                        Text("\(stats.gitCommits) \(L10n.commits)")
                             .font(.system(size: 10, weight: .medium))
                             .foregroundColor(Theme.textSecondary)
                     }
@@ -361,7 +361,7 @@ struct DashboardView: View {
                 }
 
                 if sorted.isEmpty {
-                    Text("未检测到代码变更")
+                    Text(L10n.noCodeChanges)
                         .font(.system(size: 11))
                         .foregroundColor(Theme.textTertiary)
                         .padding(.vertical, 4)
@@ -375,7 +375,7 @@ struct DashboardView: View {
     private func tokenUsageSection(stats: SessionStats) -> some View {
         GlassCard {
             VStack(alignment: .leading, spacing: 10) {
-                SectionHeader(icon: "circle.hexagonpath.fill", title: "Token 用量", accentColor: Theme.amber)
+                SectionHeader(icon: "circle.hexagonpath.fill", title: L10n.tokenUsage, accentColor: Theme.amber)
 
                 let tokenEntries = stats.tokenUsage.sorted(by: { $0.value.totalTokens > $1.value.totalTokens })
 
@@ -393,10 +393,10 @@ struct DashboardView: View {
 
                         TokenStackedBar(
                             segments: [
-                                (label: "输入", value: entry.value.inputTokens, color: Theme.cyan),
-                                (label: "输出", value: entry.value.outputTokens, color: Theme.purple),
-                                (label: "缓存读", value: entry.value.cacheReadInputTokens, color: Theme.green),
-                                (label: "缓存写", value: entry.value.cacheCreationInputTokens, color: Theme.amber),
+                                (label: L10n.input, value: entry.value.inputTokens, color: Theme.cyan),
+                                (label: L10n.output, value: entry.value.outputTokens, color: Theme.purple),
+                                (label: L10n.cacheRead, value: entry.value.cacheReadInputTokens, color: Theme.green),
+                                (label: L10n.cacheWrite, value: entry.value.cacheCreationInputTokens, color: Theme.amber),
                             ],
                             height: 10
                         )
@@ -411,9 +411,9 @@ struct DashboardView: View {
 
                 // Summary pills
                 HStack(spacing: 6) {
-                    TokenPill(label: "输入", count: stats.totalInputTokens, color: Theme.cyan)
-                    TokenPill(label: "输出", count: stats.totalOutputTokens, color: Theme.purple)
-                    TokenPill(label: "缓存", count: stats.totalCacheReadTokens + stats.totalCacheCreationTokens, color: Theme.green)
+                    TokenPill(label: L10n.input, count: stats.totalInputTokens, color: Theme.cyan)
+                    TokenPill(label: L10n.output, count: stats.totalOutputTokens, color: Theme.purple)
+                    TokenPill(label: L10n.cache, count: stats.totalCacheReadTokens + stats.totalCacheCreationTokens, color: Theme.green)
                 }
             }
         }
@@ -440,7 +440,7 @@ struct DashboardView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "bubble.left.and.bubble.right.fill")
                         .font(.system(size: 10, weight: .bold))
-                    Text("对话")
+                    Text(L10n.conversation)
                         .font(.system(size: 10, weight: .semibold))
                 }
                 .foregroundColor(Theme.purple)
@@ -470,7 +470,7 @@ struct DashboardView: View {
                                 : .default,
                             value: viewModel.isLoading
                         )
-                    Text("刷新")
+                    Text(L10n.refresh)
                         .font(.system(size: 10, weight: .semibold))
                 }
                 .foregroundColor(Theme.cyan)
@@ -523,10 +523,10 @@ struct DashboardView: View {
                         endPoint: .bottomTrailing
                     )
                 )
-            Text("暂无会话数据")
+            Text(L10n.noData)
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(Theme.textPrimary)
-            Text("启动 Claude Code 会话即可查看统计数据。")
+            Text(L10n.noDataHint)
                 .font(.system(size: 11))
                 .foregroundColor(Theme.textSecondary)
                 .multilineTextAlignment(.center)
@@ -574,12 +574,5 @@ struct DashboardView: View {
 // MARK: - TimeFilter Extension
 
 extension TimeFilter {
-    var label: String {
-        switch self {
-        case .today:  return "今天"
-        case .week:   return "本周"
-        case .month:  return "本月"
-        case .all:    return "全部"
-        }
-    }
+    var label: String { displayName }
 }

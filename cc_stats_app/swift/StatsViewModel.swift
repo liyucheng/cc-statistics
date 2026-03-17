@@ -14,10 +14,10 @@ enum TimeFilter: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .today: return "今天"
-        case .week: return "本周"
-        case .month: return "本月"
-        case .all: return "所有时间"
+        case .today: return L10n.today
+        case .week: return L10n.week
+        case .month: return L10n.month
+        case .all: return L10n.allTime
         }
     }
 
@@ -79,6 +79,13 @@ final class StatsViewModel: ObservableObject {
         }
     }
 
+    struct RefreshResult {
+        let projects: [ProjectInfo]
+        let stats: SessionStats
+        let recentSessions: [Session]
+        let todayTokens: Int
+    }
+
     func performRefresh() async {
         guard !isLoading else { return }
         isLoading = true
@@ -87,20 +94,22 @@ final class StatsViewModel: ObservableObject {
         let currentFilter = timeFilter
         let currentProject = selectedProject
 
-        let result: ([ProjectInfo], SessionStats, [Session]) = await Task.detached(priority: .userInitiated) {
+        let result: RefreshResult = await Task.detached(priority: .userInitiated) {
             let parser = SessionParser()
             let loadedProjects = parser.findAllProjects()
 
-            var sessions: [Session]
+            // 获取全部会话（用于 todayTokens 计算）
+            let allSessions: [Session]
             if let project = currentProject {
-                sessions = parser.parseSessions(forProject: project.path)
+                allSessions = parser.parseSessions(forProject: project.path)
             } else {
-                sessions = parser.parseAllSessions()
+                allSessions = parser.parseAllSessions()
             }
 
-            // Filter sessions by time range
+            // 按时间范围过滤（用于面板展示）
+            var filteredSessions = allSessions
             if let startDate = currentFilter.startDate {
-                sessions = sessions.filter { session in
+                filteredSessions = allSessions.filter { session in
                     session.messages.contains { message in
                         if let ts = message.timestamp {
                             return ts >= startDate
@@ -110,14 +119,30 @@ final class StatsViewModel: ObservableObject {
                 }
             }
 
-            let stats = SessionAnalyzer.analyze(sessions: sessions)
-            let recentSessions = sessions.sorted(by: { ($0.startTime ?? .distantPast) > ($1.startTime ?? .distantPast) }).prefix(20).map { $0 }
-            return (loadedProjects, stats, recentSessions)
+            let stats = SessionAnalyzer.analyze(sessions: filteredSessions)
+            let recent = filteredSessions
+                .sorted(by: { ($0.startTime ?? .distantPast) > ($1.startTime ?? .distantPast) })
+                .prefix(20).map { $0 }
+
+            // 计算当天 token（从同一批数据中过滤，保证同步）
+            let todayStart = Calendar.current.startOfDay(for: Date())
+            let todaySessions = allSessions.filter { session in
+                session.messages.contains { $0.timestamp.map { $0 >= todayStart } ?? false }
+            }
+            let todayStats = SessionAnalyzer.analyze(sessions: todaySessions)
+
+            return RefreshResult(
+                projects: loadedProjects,
+                stats: stats,
+                recentSessions: recent,
+                todayTokens: todayStats.totalTokens
+            )
         }.value
 
-        self.projects = result.0
-        self.stats = result.1
-        self.recentSessions = result.2
+        self.projects = result.projects
+        self.stats = result.stats
+        self.recentSessions = result.recentSessions
+        self.todayTokens = result.todayTokens
 
         // Also parse Cursor stats
         let cursorSince = currentFilter.startDate
@@ -125,19 +150,6 @@ final class StatsViewModel: ObservableObject {
             CursorParser.parse(since: cursorSince)
         }.value
         self.cursorStats = cursorResult
-
-        // 始终计算当天 token 总量（用于状态栏显示）
-        let todayResult: Int = await Task.detached(priority: .utility) {
-            let parser = SessionParser()
-            let allSessions = parser.parseAllSessions()
-            let todayStart = Calendar.current.startOfDay(for: Date())
-            let todaySessions = allSessions.filter { session in
-                session.messages.contains { $0.timestamp.map { $0 >= todayStart } ?? false }
-            }
-            let todayStats = SessionAnalyzer.analyze(sessions: todaySessions)
-            return todayStats.totalTokens
-        }.value
-        self.todayTokens = todayResult
 
         self.lastRefreshed = Date()
     }
