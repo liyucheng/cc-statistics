@@ -8,6 +8,19 @@ version = "0.1.0"
 description = "Claude Code 会话统计工具 — 分析 AI Coding 工程指标"
 requires-python = ">=3.10"
 dependencies = []
+readme = "README.md"
+license = "MIT"
+authors = [{name = "androidZzT"}]
+keywords = ["claude-code", "statistics", "ai-coding", "cli"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Quality Assurance",
+]
+
+[project.urls]
+Homepage = "https://github.com/androidZzT/cc-statistics"
+Repository = "https://github.com/androidZzT/cc-statistics"
 
 [project.scripts]
 cc-stats = "cc_stats.cli:main"
