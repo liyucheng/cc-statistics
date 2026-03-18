@@ -9,6 +9,17 @@ struct ConversationView: View {
 
     @State private var selectedSession: Session?
     @State private var toastMessage: String?
+    @State private var searchText: String = ""
+
+    private var filteredSessions: [Session] {
+        if searchText.isEmpty { return sessions }
+        let query = searchText.lowercased()
+        return sessions.filter { session in
+            session.messages.contains { msg in
+                msg.content.lowercased().contains(query)
+            }
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -63,7 +74,7 @@ struct ConversationView: View {
                     .font(.system(size: 13, weight: .bold))
                     .foregroundColor(Theme.textPrimary)
                 Spacer()
-                Text("\(sessions.count)")
+                Text("\(filteredSessions.count)")
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundColor(Theme.textTertiary)
                     .padding(.horizontal, 6)
@@ -76,11 +87,40 @@ struct ConversationView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
 
+            // Search field
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 10))
+                    .foregroundColor(Theme.textTertiary)
+                TextField(L10n.search, text: $searchText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 11))
+                    .foregroundColor(Theme.textPrimary)
+                if !searchText.isEmpty {
+                    Button {
+                        searchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(Theme.textTertiary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Theme.cardBackground)
+            )
+            .padding(.horizontal, 8)
+            .padding(.bottom, 6)
+
             Divider().background(Theme.border)
 
             ScrollView(.vertical, showsIndicators: true) {
                 LazyVStack(spacing: 2) {
-                    ForEach(sessions) { session in
+                    ForEach(filteredSessions) { session in
                         sessionRow(session)
                     }
                 }

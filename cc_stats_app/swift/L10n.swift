@@ -72,6 +72,7 @@ enum L10n {
     static var you: String { isChinese ? "你" : "You" }
     static var assistant: String { isChinese ? "助手" : "Assistant" }
     static var selectSession: String { isChinese ? "请选择一个会话" : "Select a session" }
+    static var search: String { isChinese ? "搜索会话..." : "Search..." }
     static var resumeSession: String { isChinese ? "恢复会话" : "Resume" }
     static var copied: String { isChinese ? "已复制" : "Copied" }
 
