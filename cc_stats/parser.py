@@ -129,6 +129,9 @@ def find_sessions(project_dir: Path | None = None) -> list[Path]:
             if proj.name != target_dirname:
                 continue
         for jsonl in sorted(proj.glob("*.jsonl")):
+            # 跳过子代理会话
+            if jsonl.name.startswith("agent-"):
+                continue
             results.append(jsonl)
 
     return results

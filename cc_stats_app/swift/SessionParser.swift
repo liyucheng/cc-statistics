@@ -87,6 +87,9 @@ final class SessionParser {
         var files: [String] = []
         while let element = enumerator.nextObject() as? String {
             if element.hasSuffix(".jsonl") {
+                // 跳过子代理会话（agent- 开头的文件名）
+                let fileName = (element as NSString).lastPathComponent
+                if fileName.hasPrefix("agent-") { continue }
                 files.append((directory as NSString).appendingPathComponent(element))
             }
         }
