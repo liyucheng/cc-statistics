@@ -52,6 +52,8 @@ final class StatsViewModel: ObservableObject {
     @Published var cursorStats: CursorStats?
     @Published var activeTab: StatsTab = .claudeCode
     @Published var todayTokens: Int = 0
+    @Published var todayCost: Double = 0
+    @Published var todaySessions: Int = 0
 
     enum StatsTab: String, CaseIterable {
         case claudeCode = "Claude Code"
@@ -84,6 +86,8 @@ final class StatsViewModel: ObservableObject {
         let stats: SessionStats
         let recentSessions: [Session]
         let todayTokens: Int
+        let todayCost: Double
+        let todaySessions: Int
     }
 
     func performRefresh() async {
@@ -135,7 +139,9 @@ final class StatsViewModel: ObservableObject {
                 projects: loadedProjects,
                 stats: stats,
                 recentSessions: recent,
-                todayTokens: todayStats.totalTokens
+                todayTokens: todayStats.totalTokens,
+                todayCost: todayStats.estimatedCost,
+                todaySessions: todaySessions.count
             )
         }.value
 
@@ -143,6 +149,8 @@ final class StatsViewModel: ObservableObject {
         self.stats = result.stats
         self.recentSessions = result.recentSessions
         self.todayTokens = result.todayTokens
+        self.todayCost = result.todayCost
+        self.todaySessions = result.todaySessions
 
         // Also parse Cursor stats
         let cursorSince = currentFilter.startDate

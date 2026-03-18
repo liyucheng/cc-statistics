@@ -99,6 +99,10 @@ struct Session: Identifiable {
     let messages: [Message]
     let projectPath: String?
 
+    var sessionName: String {
+        ((filePath as NSString).lastPathComponent as NSString).deletingPathExtension
+    }
+
     var startTime: Date? {
         messages.compactMap(\.timestamp).min()
     }
@@ -189,6 +193,70 @@ struct SessionStats {
 
     var totalTokens: Int {
         tokenUsage.values.reduce(0) { $0 + $1.totalTokens }
+    }
+
+    var estimatedCost: Double {
+        CostEstimator.estimateCost(tokenUsage: tokenUsage)
+    }
+}
+
+// MARK: - Cost Estimation
+
+struct ModelPricing {
+    let inputPerMillion: Double       // $/M input tokens
+    let outputPerMillion: Double      // $/M output tokens
+    let cacheReadPerMillion: Double   // $/M cache read tokens
+    let cacheCreatePerMillion: Double // $/M cache creation tokens
+}
+
+enum CostEstimator {
+    // Claude API pricing (as of 2025)
+    private static let pricing: [String: ModelPricing] = [
+        "opus": ModelPricing(inputPerMillion: 15, outputPerMillion: 75, cacheReadPerMillion: 1.5, cacheCreatePerMillion: 18.75),
+        "sonnet": ModelPricing(inputPerMillion: 3, outputPerMillion: 15, cacheReadPerMillion: 0.3, cacheCreatePerMillion: 3.75),
+        "haiku": ModelPricing(inputPerMillion: 0.8, outputPerMillion: 4, cacheReadPerMillion: 0.08, cacheCreatePerMillion: 1.0),
+    ]
+
+    static func estimateCost(tokenUsage: [String: TokenDetail]) -> Double {
+        var total = 0.0
+        for (model, detail) in tokenUsage {
+            let p = matchPricing(model)
+            total += Double(detail.inputTokens) / 1_000_000 * p.inputPerMillion
+            total += Double(detail.outputTokens) / 1_000_000 * p.outputPerMillion
+            total += Double(detail.cacheReadInputTokens) / 1_000_000 * p.cacheReadPerMillion
+            total += Double(detail.cacheCreationInputTokens) / 1_000_000 * p.cacheCreatePerMillion
+        }
+        return total
+    }
+
+    static func estimateCostForModel(_ model: String, detail: TokenDetail) -> Double {
+        let p = matchPricing(model)
+        var cost = 0.0
+        cost += Double(detail.inputTokens) / 1_000_000 * p.inputPerMillion
+        cost += Double(detail.outputTokens) / 1_000_000 * p.outputPerMillion
+        cost += Double(detail.cacheReadInputTokens) / 1_000_000 * p.cacheReadPerMillion
+        cost += Double(detail.cacheCreationInputTokens) / 1_000_000 * p.cacheCreatePerMillion
+        return cost
+    }
+
+    private static func matchPricing(_ model: String) -> ModelPricing {
+        let lower = model.lowercased()
+        if lower.contains("opus") { return pricing["opus"]! }
+        if lower.contains("haiku") { return pricing["haiku"]! }
+        // Default to sonnet pricing
+        return pricing["sonnet"]!
+    }
+
+    static func formatCost(_ cost: Double) -> String {
+        if cost >= 100 {
+            return String(format: "$%.0f", cost)
+        } else if cost >= 1 {
+            return String(format: "$%.2f", cost)
+        } else if cost >= 0.01 {
+            return String(format: "$%.3f", cost)
+        } else {
+            return String(format: "$%.4f", cost)
+        }
     }
 }
 

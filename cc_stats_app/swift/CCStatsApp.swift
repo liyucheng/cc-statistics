@@ -156,12 +156,27 @@ private func drawClaudeLogo(size: NSSize) -> NSImage {
     return image
 }
 
+// MARK: - Status Bar Display Mode
+
+enum StatusBarDisplayMode: String {
+    case tokenAndCost = "token_cost"
+    case tokenOnly = "token"
+    case costOnly = "cost"
+    case sessionCount = "sessions"
+}
+
 // MARK: - StatusBarController
 
 class StatusBarController {
     private(set) var statusItem: NSStatusItem
     private let onToggle: () -> Void
     private let onToggleChat: () -> Void
+    var displayMode: StatusBarDisplayMode = .tokenAndCost
+
+    // Cached values for re-rendering on mode switch
+    private var lastTokens: Int = 0
+    private var lastCost: Double = 0
+    private var lastSessions: Int = 0
 
     init(onToggle: @escaping () -> Void, onToggleChat: @escaping () -> Void) {
         self.onToggle = onToggle
@@ -182,30 +197,82 @@ class StatusBarController {
     @objc func handleClick(_ sender: NSStatusBarButton) {
         let event = NSApp.currentEvent
         if event?.type == .rightMouseUp {
-            let menu = NSMenu()
-            menu.addItem(NSMenuItem(title: L10n.showDashboard, action: #selector(showDashboard), keyEquivalent: ""))
-            menu.addItem(NSMenuItem(title: L10n.showChat, action: #selector(showChat), keyEquivalent: ""))
-            menu.addItem(NSMenuItem.separator())
-            menu.addItem(NSMenuItem(title: L10n.quit, action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
-            for item in menu.items { item.target = self }
-            statusItem.menu = menu
-            statusItem.button?.performClick(nil)
-            statusItem.menu = nil
+            showContextMenu()
         } else {
             onToggle()
+        }
+    }
+
+    private func showContextMenu() {
+        let menu = NSMenu()
+
+        // Display mode submenu
+        let displayMenu = NSMenu()
+        let modes: [(StatusBarDisplayMode, String)] = [
+            (.tokenAndCost, "Token + \(L10n.cost)"),
+            (.tokenOnly, "Token"),
+            (.costOnly, L10n.cost),
+            (.sessionCount, L10n.sessions),
+        ]
+        for (mode, title) in modes {
+            let item = NSMenuItem(title: title, action: #selector(switchDisplayMode(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = mode.rawValue
+            if displayMode == mode { item.state = .on }
+            displayMenu.addItem(item)
+        }
+        let displayItem = NSMenuItem(title: L10n.statusBarDisplay, action: nil, keyEquivalent: "")
+        displayItem.submenu = displayMenu
+        menu.addItem(displayItem)
+
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(NSMenuItem(title: L10n.showDashboard, action: #selector(showDashboard), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: L10n.showChat, action: #selector(showChat), keyEquivalent: ""))
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(NSMenuItem(title: L10n.quit, action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        for item in menu.items { item.target = self }
+
+        statusItem.menu = menu
+        statusItem.button?.performClick(nil)
+        statusItem.menu = nil
+    }
+
+    @objc func switchDisplayMode(_ sender: NSMenuItem) {
+        if let raw = sender.representedObject as? String,
+           let mode = StatusBarDisplayMode(rawValue: raw) {
+            displayMode = mode
+            refreshLabel()
         }
     }
 
     @objc func showDashboard() { onToggle() }
     @objc func showChat() { onToggleChat() }
 
-    func updateTokenLabel(_ totalTokens: Int) {
+    func updateTokenLabel(_ totalTokens: Int, cost: Double = 0, sessions: Int = 0) {
+        lastTokens = totalTokens
+        lastCost = cost
+        lastSessions = sessions
+        refreshLabel()
+    }
+
+    private func refreshLabel() {
         guard let button = statusItem.button else { return }
-        if totalTokens > 0 {
-            button.title = " \(Self.formatTokens(totalTokens))"
-        } else {
-            button.title = ""
+
+        var text = ""
+        switch displayMode {
+        case .tokenAndCost:
+            if lastTokens > 0 {
+                let costStr = lastCost > 0 ? " \(CostEstimator.formatCost(lastCost))" : ""
+                text = " \(Self.formatTokens(lastTokens))\(costStr)"
+            }
+        case .tokenOnly:
+            if lastTokens > 0 { text = " \(Self.formatTokens(lastTokens))" }
+        case .costOnly:
+            if lastCost > 0 { text = " \(CostEstimator.formatCost(lastCost))" }
+        case .sessionCount:
+            if lastSessions > 0 { text = " \(lastSessions)" }
         }
+        button.title = text
     }
 
     private static func formatTokens(_ n: Int) -> String {
@@ -378,10 +445,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func observeTokenUsage() {
         viewModel.$todayTokens
+            .combineLatest(viewModel.$todayCost, viewModel.$todaySessions)
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] total in
+            .sink { [weak self] tokens, cost, sessions in
                 guard let self = self else { return }
-                self.statusBarController?.updateTokenLabel(total)
+                self.statusBarController?.updateTokenLabel(tokens, cost: cost, sessions: sessions)
             }
             .store(in: &cancellables)
     }

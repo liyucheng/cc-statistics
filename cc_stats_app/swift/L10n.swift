@@ -66,4 +66,19 @@ enum L10n {
     static var you: String { isChinese ? "你" : "You" }
     static var assistant: String { isChinese ? "助手" : "Assistant" }
     static var selectSession: String { isChinese ? "请选择一个会话" : "Select a session" }
+    static var resumeSession: String { isChinese ? "恢复会话" : "Resume" }
+    static var copied: String { isChinese ? "已复制" : "Copied" }
+
+    // MARK: - Cost
+    static var estimatedCost: String { isChinese ? "预估费用" : "Est. Cost" }
+    static var cost: String { isChinese ? "费用" : "Cost" }
+
+    // MARK: - Status Bar
+    static var statusBarDisplay: String { isChinese ? "状态栏显示" : "Display" }
+
+    // MARK: - Export
+    static var exportData: String { isChinese ? "导出数据" : "Export Data" }
+    static var exportJSON: String { "JSON" }
+    static var exportCSV: String { "CSV" }
+    static var exported: String { isChinese ? "已导出" : "Exported" }
 }

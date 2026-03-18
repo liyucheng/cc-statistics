@@ -1,4 +1,6 @@
 import SwiftUI
+import AppKit
+import UniformTypeIdentifiers
 
 // MARK: - DashboardView
 
@@ -154,6 +156,20 @@ struct DashboardView: View {
 
             Spacer()
 
+            // Export button
+            if let stats = viewModel.stats {
+                Menu {
+                    Button(L10n.exportJSON) { exportJSON(stats: stats) }
+                    Button(L10n.exportCSV) { exportCSV(stats: stats) }
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(Theme.textSecondary)
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+            }
+
             // Time filter pills
             timeFilterPills
         }
@@ -227,9 +243,9 @@ struct DashboardView: View {
                 accentColor: Theme.green
             )
             StatCard(
-                icon: "circlebadge.2.fill",
-                title: L10n.token,
-                value: formatTokens(stats.totalTokens),
+                icon: "dollarsign.circle.fill",
+                title: L10n.estimatedCost,
+                value: CostEstimator.formatCost(stats.estimatedCost),
                 accentColor: Theme.amber
             )
         }
@@ -386,6 +402,9 @@ struct DashboardView: View {
                                 .font(.system(size: 11, weight: .semibold, design: .monospaced))
                                 .foregroundColor(Theme.textPrimary)
                             Spacer()
+                            Text(CostEstimator.formatCost(CostEstimator.estimateCostForModel(entry.key, detail: entry.value)))
+                                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                .foregroundColor(Theme.amber)
                             Text(formatTokens(entry.value.totalTokens))
                                 .font(.system(size: 10, weight: .bold, design: .monospaced))
                                 .foregroundColor(Theme.textSecondary)
@@ -414,6 +433,10 @@ struct DashboardView: View {
                     TokenPill(label: L10n.input, count: stats.totalInputTokens, color: Theme.cyan)
                     TokenPill(label: L10n.output, count: stats.totalOutputTokens, color: Theme.purple)
                     TokenPill(label: L10n.cache, count: stats.totalCacheReadTokens + stats.totalCacheCreationTokens, color: Theme.green)
+                    Spacer()
+                    Text(CostEstimator.formatCost(stats.estimatedCost))
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .foregroundColor(Theme.amber)
                 }
             }
         }
@@ -568,6 +591,78 @@ struct DashboardView: View {
             dict[change.language] = (existing.add + change.additions, existing.del + change.deletions)
         }
         return dict.map { (language: $0.key, additions: $0.value.add, deletions: $0.value.del) }
+    }
+
+    // MARK: - Export
+
+    private func exportJSON(stats: SessionStats) {
+        var data: [String: Any] = [
+            "sessions": stats.sessionCount,
+            "instructions": stats.userInstructions,
+            "total_duration_seconds": stats.totalDuration,
+            "ai_processing_seconds": stats.aiProcessingTime,
+            "user_active_seconds": stats.userActiveTime,
+            "total_tokens": stats.totalTokens,
+            "estimated_cost_usd": round(stats.estimatedCost * 100) / 100,
+            "git_commits": stats.gitCommits,
+            "git_additions": stats.gitAdditions,
+            "git_deletions": stats.gitDeletions,
+        ]
+        // Tool calls
+        data["tool_calls"] = stats.toolCalls
+        // Token by model
+        var tokenByModel: [String: [String: Any]] = [:]
+        for (model, detail) in stats.tokenUsage {
+            tokenByModel[model] = [
+                "input": detail.inputTokens,
+                "output": detail.outputTokens,
+                "cache_read": detail.cacheReadInputTokens,
+                "cache_creation": detail.cacheCreationInputTokens,
+                "total": detail.totalTokens,
+                "cost_usd": round(CostEstimator.estimateCostForModel(model, detail: detail) * 100) / 100,
+            ]
+        }
+        data["token_by_model"] = tokenByModel
+
+        if let jsonData = try? JSONSerialization.data(withJSONObject: data, options: [.prettyPrinted, .sortedKeys]),
+           let jsonStr = String(data: jsonData, encoding: .utf8) {
+            saveToFile(content: jsonStr, ext: "json")
+        }
+    }
+
+    private func exportCSV(stats: SessionStats) {
+        var lines = ["metric,value"]
+        lines.append("sessions,\(stats.sessionCount)")
+        lines.append("instructions,\(stats.userInstructions)")
+        lines.append("total_duration_seconds,\(Int(stats.totalDuration))")
+        lines.append("ai_processing_seconds,\(Int(stats.aiProcessingTime))")
+        lines.append("user_active_seconds,\(Int(stats.userActiveTime))")
+        lines.append("total_tokens,\(stats.totalTokens)")
+        lines.append("estimated_cost_usd,\(String(format: "%.2f", stats.estimatedCost))")
+        lines.append("git_commits,\(stats.gitCommits)")
+        lines.append("git_additions,\(stats.gitAdditions)")
+        lines.append("git_deletions,\(stats.gitDeletions)")
+
+        for (tool, count) in stats.toolCalls.sorted(by: { $0.value > $1.value }) {
+            lines.append("tool_\(tool),\(count)")
+        }
+        for (model, detail) in stats.tokenUsage.sorted(by: { $0.value.totalTokens > $1.value.totalTokens }) {
+            lines.append("token_\(model)_total,\(detail.totalTokens)")
+            lines.append("token_\(model)_cost_usd,\(String(format: "%.2f", CostEstimator.estimateCostForModel(model, detail: detail)))")
+        }
+
+        saveToFile(content: lines.joined(separator: "\n"), ext: "csv")
+    }
+
+    private func saveToFile(content: String, ext: String) {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = ext == "json" ? [.json] : [.commaSeparatedText]
+        panel.nameFieldStringValue = "cc-stats-export.\(ext)"
+        panel.begin { response in
+            if response == .OK, let url = panel.url {
+                try? content.write(to: url, atomically: true, encoding: .utf8)
+            }
+        }
     }
 }
 

@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 // MARK: - ConversationView
 
@@ -7,20 +8,43 @@ struct ConversationView: View {
     var onClose: () -> Void
 
     @State private var selectedSession: Session?
+    @State private var toastMessage: String?
 
     var body: some View {
-        HSplitView {
-            // Session list
-            sessionList
-                .frame(minWidth: 160, idealWidth: 180)
+        ZStack {
+            HSplitView {
+                // Session list
+                sessionList
+                    .frame(minWidth: 160, idealWidth: 180)
 
-            // Message detail
-            if let session = selectedSession {
-                messageDetail(session: session)
-                    .frame(minWidth: 220)
-            } else {
-                emptySelection
-                    .frame(minWidth: 220)
+                // Message detail
+                if let session = selectedSession {
+                    messageDetail(session: session)
+                        .frame(minWidth: 220)
+                } else {
+                    emptySelection
+                        .frame(minWidth: 220)
+                }
+            }
+
+            // Toast overlay
+            if let msg = toastMessage {
+                VStack {
+                    Spacer()
+                    Text(msg)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(Theme.green.opacity(0.9))
+                        )
+                        .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .padding(.bottom, 16)
+                }
+                .animation(.easeInOut(duration: 0.25), value: toastMessage != nil)
             }
         }
         .frame(minWidth: 420, minHeight: 400)
@@ -73,15 +97,29 @@ struct ConversationView: View {
 
         return Button {
             selectedSession = session
+
+            // Copy resume command
+            let cmd = "claude --resume \"\(session.sessionName)\""
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(cmd, forType: .string)
+
+            withAnimation {
+                toastMessage = "\(L10n.copied): claude --resume"
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                withAnimation {
+                    toastMessage = nil
+                }
+            }
         } label: {
             VStack(alignment: .leading, spacing: 4) {
                 if let start = session.startTime {
-                    Text(start, style: .date)
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(isSelected ? Theme.cyan : Theme.textSecondary)
-                    Text(start, style: .time)
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(Theme.textTertiary)
+                    HStack(spacing: 4) {
+                        Text(start, style: .date)
+                        Text(start, style: .time)
+                    }
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(isSelected ? Theme.cyan : Theme.textSecondary)
                 }
                 Text(preview)
                     .font(.system(size: 10))
@@ -89,6 +127,12 @@ struct ConversationView: View {
                     .lineLimit(2)
 
                 HStack(spacing: 6) {
+                    Text(session.sessionName.prefix(8) + "...")
+                        .font(.system(size: 8, weight: .medium, design: .monospaced))
+                        .foregroundColor(Theme.textTertiary.opacity(0.6))
+
+                    Spacer()
+
                     Label("\(userMessages.count)", systemImage: "text.bubble")
                     Label("\(session.messages.count)", systemImage: "message")
                 }
