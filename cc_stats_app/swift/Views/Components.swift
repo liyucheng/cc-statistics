@@ -29,13 +29,13 @@ extension Color {
 // MARK: - Theme
 
 enum Theme {
-    static let background = Color(hex: "1A1B2E")
-    static let cardBackground = Color(hex: "252640")
-    static let cardBackgroundLight = Color(hex: "2E2F4A")
-    static let textPrimary = Color.white
-    static let textSecondary = Color(hex: "9CA3AF")
-    static let textTertiary = Color(hex: "6B7280")
-    static let border = Color.white.opacity(0.06)
+    static let background = Color(nsColor: .windowBackgroundColor)
+    static let cardBackground = Color(nsColor: .controlBackgroundColor).opacity(0.6)
+    static let cardBackgroundLight = Color(nsColor: .controlBackgroundColor).opacity(0.8)
+    static let textPrimary = Color(nsColor: .labelColor)
+    static let textSecondary = Color(nsColor: .secondaryLabelColor)
+    static let textTertiary = Color(nsColor: .tertiaryLabelColor)
+    static let border = Color(nsColor: .separatorColor)
 
     static let cyan = Color(hex: "00D4FF")
     static let purple = Color(hex: "8B5CF6")

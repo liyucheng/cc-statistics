@@ -48,6 +48,9 @@ enum L10n {
     static var cacheWrite: String { isChinese ? "缓存写" : "Cache Write" }
     static var cache: String { isChinese ? "缓存" : "Cache" }
 
+    // MARK: - Data Source
+    static var allSources: String { isChinese ? "全部来源" : "All Sources" }
+
     // MARK: - Project
     static var allProjects: String { isChinese ? "所有项目" : "All Projects" }
 
@@ -108,4 +111,9 @@ enum L10n {
     static var displayLanguage: String { isChinese ? "显示语言" : "Display Language" }
     static var followSystem: String { isChinese ? "跟随系统" : "Follow System" }
     static var about: String { isChinese ? "关于" : "About" }
+    static var appearance: String { isChinese ? "外观" : "Appearance" }
+    static var theme: String { isChinese ? "主题" : "Theme" }
+    static var themeAuto: String { isChinese ? "跟随系统" : "System" }
+    static var themeDark: String { isChinese ? "深色" : "Dark" }
+    static var themeLight: String { isChinese ? "浅色" : "Light" }
 }

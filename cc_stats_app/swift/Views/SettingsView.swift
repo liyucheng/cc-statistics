@@ -6,8 +6,10 @@ import ServiceManagement
 struct SettingsView: View {
     @Binding var isPresented: Bool
     var onLanguageChanged: (() -> Void)?
+    var onThemeChanged: ((String) -> Void)?
     @State private var launchAtLogin: Bool = false
     @State private var language: String = "auto"
+    @State private var theme: String = "auto"
 
     var body: some View {
         VStack(spacing: 0) {
@@ -63,6 +65,20 @@ struct SettingsView: View {
                         )
                     }
 
+                    // Appearance section
+                    settingsSection(title: L10n.appearance, icon: "paintbrush.fill") {
+                        settingsPicker(
+                            icon: "circle.lefthalf.filled",
+                            title: L10n.theme,
+                            selection: $theme,
+                            options: [
+                                ("auto", L10n.themeAuto),
+                                ("dark", L10n.themeDark),
+                                ("light", L10n.themeLight),
+                            ]
+                        )
+                    }
+
                     // About section
                     settingsSection(title: L10n.about, icon: "info.circle.fill") {
                         HStack {
@@ -105,6 +121,9 @@ struct SettingsView: View {
         }
         .onChange(of: language) { newValue in
             saveLanguageSetting(newValue)
+        }
+        .onChange(of: theme) { newValue in
+            saveThemeSetting(newValue)
         }
     }
 
@@ -171,6 +190,7 @@ struct SettingsView: View {
             launchAtLogin = SMAppService.mainApp.status == .enabled
         }
         language = UserDefaults.standard.string(forKey: "cc_stats_language") ?? "auto"
+        theme = UserDefaults.standard.string(forKey: "cc_stats_theme") ?? "auto"
     }
 
     private func toggleLaunchAtLogin(_ enable: Bool) {
@@ -188,5 +208,10 @@ struct SettingsView: View {
     private func saveLanguageSetting(_ lang: String) {
         UserDefaults.standard.set(lang, forKey: "cc_stats_language")
         onLanguageChanged?()
+    }
+
+    private func saveThemeSetting(_ theme: String) {
+        UserDefaults.standard.set(theme, forKey: "cc_stats_theme")
+        onThemeChanged?(theme)
     }
 }

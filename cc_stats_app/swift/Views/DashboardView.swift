@@ -14,20 +14,18 @@ struct DashboardView: View {
             if viewModel.showSettings {
                 SettingsView(
                     isPresented: $viewModel.showSettings,
-                    onLanguageChanged: { viewModel.languageVersion += 1 }
+                    onLanguageChanged: { viewModel.languageVersion += 1 },
+                    onThemeChanged: { viewModel.themeMode = $0 }
                 )
             } else {
                 VStack(spacing: 0) {
                     // Top toolbar
                     toolbarSection
 
-                    // Tab switcher (hidden, code retained)
-                    // tabSwitcher
-
-                    if viewModel.activeTab == .claudeCode {
-                        claudeCodeContent
-                    } else {
+                    if viewModel.selectedSource == .cursor {
                         cursorContent
+                    } else {
+                        claudeCodeContent
                     }
 
                     // Bottom bar
@@ -60,6 +58,15 @@ struct DashboardView: View {
         .frame(width: 480)
         .frame(maxHeight: 640)
         .background(Theme.background)
+        .preferredColorScheme(resolvedColorScheme)
+    }
+
+    private var resolvedColorScheme: ColorScheme? {
+        switch viewModel.themeMode {
+        case "dark": return .dark
+        case "light": return .light
+        default: return nil  // follow system
+        }
     }
 
     // MARK: - Tab Switcher
@@ -183,6 +190,47 @@ struct DashboardView: View {
                             .fill(Theme.cardBackground)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .strokeBorder(Theme.border, lineWidth: 1)
+                            )
+                    )
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+
+                // Source filter
+                Menu {
+                    ForEach(DataSource.allCases) { source in
+                        Button {
+                            viewModel.selectSource(source)
+                        } label: {
+                            HStack {
+                                Image(systemName: source.icon)
+                                Text(source.displayName)
+                                if viewModel.selectedSource == source {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        sourceIcon(viewModel.selectedSource, size: 12)
+                            .foregroundColor(Theme.purple)
+                        Text(viewModel.selectedSource.displayName)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(Theme.textPrimary)
+                            .lineLimit(1)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 7, weight: .bold))
+                            .foregroundColor(Theme.textTertiary)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(Theme.cardBackground)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
                                     .strokeBorder(Theme.border, lineWidth: 1)
                             )
                     )
@@ -660,6 +708,12 @@ struct DashboardView: View {
     }
 
     // MARK: - Helpers
+
+    @ViewBuilder
+    private func sourceIcon(_ source: DataSource, size: CGFloat) -> some View {
+        Image(systemName: source.icon)
+            .font(.system(size: size * 0.75, weight: .semibold))
+    }
 
     private func formatDuration(_ seconds: TimeInterval) -> String {
         let totalSeconds = Int(seconds)

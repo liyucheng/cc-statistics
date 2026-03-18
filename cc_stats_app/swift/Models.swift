@@ -1,5 +1,34 @@
 import Foundation
 
+// MARK: - Data Source
+
+enum DataSource: String, CaseIterable, Identifiable {
+    case all
+    case claudeCode
+    case codex
+    case cursor
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .all: return L10n.allSources
+        case .claudeCode: return "Claude Code"
+        case .codex: return "Codex"
+        case .cursor: return "Cursor"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .all: return "square.stack.3d.up"
+        case .claudeCode: return "sparkles"
+        case .codex: return "chevron.left.forwardslash.chevron.right"
+        case .cursor: return "cursorarrow.rays"
+        }
+    }
+}
+
 // MARK: - Token Detail
 
 struct TokenDetail: Codable, Equatable {
@@ -225,9 +254,17 @@ struct ModelPricing {
 enum CostEstimator {
     // Claude API pricing (as of 2025)
     private static let pricing: [String: ModelPricing] = [
+        // Claude
         "opus": ModelPricing(inputPerMillion: 15, outputPerMillion: 75, cacheReadPerMillion: 1.5, cacheCreatePerMillion: 18.75),
         "sonnet": ModelPricing(inputPerMillion: 3, outputPerMillion: 15, cacheReadPerMillion: 0.3, cacheCreatePerMillion: 3.75),
         "haiku": ModelPricing(inputPerMillion: 0.8, outputPerMillion: 4, cacheReadPerMillion: 0.08, cacheCreatePerMillion: 1.0),
+        // OpenAI
+        "gpt-4o": ModelPricing(inputPerMillion: 2.5, outputPerMillion: 10, cacheReadPerMillion: 1.25, cacheCreatePerMillion: 2.5),
+        "gpt-4o-mini": ModelPricing(inputPerMillion: 0.15, outputPerMillion: 0.6, cacheReadPerMillion: 0.075, cacheCreatePerMillion: 0.15),
+        "o1": ModelPricing(inputPerMillion: 15, outputPerMillion: 60, cacheReadPerMillion: 7.5, cacheCreatePerMillion: 15),
+        "o3": ModelPricing(inputPerMillion: 10, outputPerMillion: 40, cacheReadPerMillion: 2.5, cacheCreatePerMillion: 10),
+        "o3-mini": ModelPricing(inputPerMillion: 1.1, outputPerMillion: 4.4, cacheReadPerMillion: 0.55, cacheCreatePerMillion: 1.1),
+        "o4-mini": ModelPricing(inputPerMillion: 1.1, outputPerMillion: 4.4, cacheReadPerMillion: 0.55, cacheCreatePerMillion: 1.1),
     ]
 
     static func estimateCost(tokenUsage: [String: TokenDetail]) -> Double {
@@ -254,9 +291,18 @@ enum CostEstimator {
 
     private static func matchPricing(_ model: String) -> ModelPricing {
         let lower = model.lowercased()
+        // Claude models
         if lower.contains("opus") { return pricing["opus"]! }
         if lower.contains("haiku") { return pricing["haiku"]! }
-        // Default to sonnet pricing
+        if lower.contains("sonnet") { return pricing["sonnet"]! }
+        // OpenAI models
+        if lower.contains("o4-mini") { return pricing["o4-mini"]! }
+        if lower.contains("o3-mini") { return pricing["o3-mini"]! }
+        if lower.contains("o3") { return pricing["o3"]! }
+        if lower.contains("o1") { return pricing["o1"]! }
+        if lower.contains("gpt-4o-mini") { return pricing["gpt-4o-mini"]! }
+        if lower.contains("gpt-4o") { return pricing["gpt-4o"]! }
+        // Default to sonnet pricing for unknown
         return pricing["sonnet"]!
     }
 

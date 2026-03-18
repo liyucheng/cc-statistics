@@ -111,7 +111,7 @@ class HotkeyManager {
 
 // MARK: - Claude Logo Icon
 
-private let claudeBitmap: [[Int]] = [
+let claudeBitmap: [[Int]] = [
     [0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0],
     [0,0,0,1,1,0,1,1,1,1,1,1,0,1,1,0,0,0],
     [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0],
@@ -119,7 +119,7 @@ private let claudeBitmap: [[Int]] = [
     [0,0,0,0,1,0,1,0,0,0,0,1,0,1,0,0,0,0],
 ]
 
-private func drawClaudeLogo(size: NSSize) -> NSImage {
+func drawClaudeLogo(size: NSSize) -> NSImage {
     let image = NSImage(size: size, flipped: true) { rect in
         let cols = claudeBitmap[0].count
         let rows = claudeBitmap.count
@@ -369,6 +369,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupGlobalHotkey()
         observeConversationPanel()
         observeTokenUsage()
+        observeTheme()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -465,7 +466,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let contentView = DashboardView(viewModel: viewModel)
-            .environment(\.colorScheme, .dark)
             .frame(minWidth: 480, minHeight: 500)
 
         let panel = NSPanel(
@@ -481,7 +481,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
         panel.standardWindowButton(.zoomButton)?.isHidden = true
 
-        panel.backgroundColor = NSColor(red: 0.102, green: 0.106, blue: 0.18, alpha: 1)
+        panel.backgroundColor = .windowBackgroundColor
         panel.contentView = NSHostingView(rootView: contentView)
         panel.isReleasedWhenClosed = false
         panel.level = .floating
@@ -489,7 +489,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         panel.isFloatingPanel = true
         panel.hasShadow = true
         panel.isMovableByWindowBackground = false
-        panel.appearance = NSAppearance(named: .darkAqua)
+        applyThemeToPanel(panel)
 
         // 圆角
         panel.contentView?.wantsLayer = true
@@ -507,7 +507,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    // MARK: - Conversation Panel
+    // MARK: - Theme
+
+    private func applyThemeToPanel(_ panel: NSPanel) {
+        let theme = viewModel.themeMode
+        switch theme {
+        case "dark":
+            panel.appearance = NSAppearance(named: .darkAqua)
+        case "light":
+            panel.appearance = NSAppearance(named: .aqua)
+        default:
+            panel.appearance = nil  // follow system
+        }
+    }
+
+    private func observeTheme() {
+        viewModel.$themeMode
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self = self, let window = self.mainWindow as? NSPanel else { return }
+                self.applyThemeToPanel(window)
+            }
+            .store(in: &cancellables)
+    }
 
     // MARK: - Token Usage in Status Bar
 

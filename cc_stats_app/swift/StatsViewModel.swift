@@ -43,6 +43,7 @@ enum TimeFilter: String, CaseIterable, Identifiable {
 final class StatsViewModel: ObservableObject {
     @Published var projects: [ProjectInfo] = []
     @Published var selectedProject: ProjectInfo?
+    @Published var selectedSource: DataSource = .all
     @Published var timeFilter: TimeFilter = .today
     @Published var stats: SessionStats?
     @Published var isLoading = false
@@ -57,6 +58,7 @@ final class StatsViewModel: ObservableObject {
     @Published var dailyStats: [DailyStatPoint] = []
     @Published var showSettings: Bool = false
     @Published var languageVersion: Int = 0  // 递增以触发 UI 刷新
+    @Published var themeMode: String = UserDefaults.standard.string(forKey: "cc_stats_theme") ?? "auto"
 
     enum StatsTab: String, CaseIterable {
         case claudeCode = "Claude Code"
@@ -96,23 +98,54 @@ final class StatsViewModel: ObservableObject {
         let dailyStats: [DailyStatPoint]
     }
 
+    func selectSource(_ source: DataSource) {
+        selectedSource = source
+        refresh()
+    }
+
     func performRefresh() async {
         isLoading = true
         defer { isLoading = false }
 
         let currentFilter = timeFilter
         let currentProject = selectedProject
+        let currentSource = selectedSource
 
         let result: RefreshResult = await Task.detached(priority: .userInitiated) {
-            let parser = SessionParser()
-            let loadedProjects = parser.findAllProjects()
+            let claudeParser = SessionParser()
+            let codexParser = CodexParser()
 
-            // 获取全部会话（用于 todayTokens 计算）
-            let allSessions: [Session]
-            if let project = currentProject {
-                allSessions = parser.parseSessions(forProject: project.path)
-            } else {
-                allSessions = parser.parseAllSessions()
+            // 根据 source 获取 projects 和 sessions
+            var loadedProjects: [ProjectInfo] = []
+            var allSessions: [Session] = []
+
+            switch currentSource {
+            case .all:
+                loadedProjects = claudeParser.findAllProjects() + codexParser.findAllProjects()
+                if let project = currentProject {
+                    allSessions = claudeParser.parseSessions(forProject: project.path)
+                        + codexParser.parseSessions(forProject: project.path)
+                } else {
+                    allSessions = claudeParser.parseAllSessions() + codexParser.parseAllSessions()
+                }
+            case .claudeCode:
+                loadedProjects = claudeParser.findAllProjects()
+                if let project = currentProject {
+                    allSessions = claudeParser.parseSessions(forProject: project.path)
+                } else {
+                    allSessions = claudeParser.parseAllSessions()
+                }
+            case .codex:
+                loadedProjects = codexParser.findAllProjects()
+                if let project = currentProject {
+                    allSessions = codexParser.parseSessions(forProject: project.path)
+                } else {
+                    allSessions = codexParser.parseAllSessions()
+                }
+            case .cursor:
+                // Cursor uses a different parser (CursorParser), sessions handled separately
+                loadedProjects = claudeParser.findAllProjects()
+                allSessions = []
             }
 
             // 按时间范围过滤（用于面板展示）
@@ -186,12 +219,16 @@ final class StatsViewModel: ObservableObject {
         self.todaySessions = result.todaySessions
         self.dailyStats = result.dailyStats
 
-        // Also parse Cursor stats
-        let cursorSince = currentFilter.startDate
-        let cursorResult: CursorStats = await Task.detached(priority: .userInitiated) {
-            CursorParser.parse(since: cursorSince)
-        }.value
-        self.cursorStats = cursorResult
+        // Parse Cursor stats only when relevant
+        if currentSource == .cursor || currentSource == .all {
+            let cursorSince = currentFilter.startDate
+            let cursorResult: CursorStats = await Task.detached(priority: .userInitiated) {
+                CursorParser.parse(since: cursorSince)
+            }.value
+            self.cursorStats = cursorResult
+        } else {
+            self.cursorStats = nil
+        }
 
         self.lastRefreshed = Date()
     }

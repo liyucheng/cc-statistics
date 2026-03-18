@@ -78,8 +78,10 @@ cc-stats-app
 
 **More:**
 - Global hotkey `Cmd+Shift+C`
+- Multi-source support: Claude Code / Codex / Cursor, switch or aggregate
+- Theme: Follow System / Dark / Light
 - Export stats to JSON / CSV (auto-saves to Desktop)
-- Settings: Launch at login, language switch
+- Settings: Launch at login, language switch, theme
 - Click outside to dismiss (with animation)
 
 ## Data Sources
