@@ -35,7 +35,7 @@ pipx install cc-statistics
 pip install cc-statistics
 ```
 
-Zero dependencies — Python stdlib only.
+The CLI tool (`cc-stats`) has zero dependencies — Python stdlib only.
 
 ### From Source (development)
 
@@ -48,6 +48,8 @@ pip install -e .
 ```
 
 ## Usage
+
+### CLI
 
 ```bash
 # List all projects
@@ -75,6 +77,39 @@ cc-stats --all --since 1h           # Last 1 hour
 cc-stats --all --since 2026-03-01 --until 2026-03-15  # Date range
 cc-stats sailor --since 2026-03-13T10:00               # Down to the minute
 ```
+
+### macOS Menu Bar Panel
+
+A native SwiftUI panel that lives in your macOS menu bar, showing Claude logo + today's token usage. Click to open a dark-themed statistics dashboard.
+
+<img src="docs/screenshot.png" width="420" alt="CC Stats Dashboard">
+
+> Requires macOS + Xcode Command Line Tools (`xcode-select --install`). The Swift component is automatically compiled on first launch.
+
+```bash
+# pip / pipx install
+pip install cc-statistics
+cc-stats-app
+
+# Or from source
+git clone https://github.com/androidZzT/cc-statistics.git
+cd cc-statistics && pip install -e .
+cc-stats-app
+```
+
+**Features:**
+
+- Menu bar icon with real-time today's token usage (auto-refresh)
+- Click to open a native SwiftUI dark-themed panel:
+  - Project selector + time range filter (Today / Week / Month / All)
+  - 4 stat cards: Sessions, Instructions, Duration, Tokens
+  - Dev time breakdown: AI ratio ring + time details
+  - Code changes: Git commits + per-language additions/deletions
+  - Token usage: stacked bar by model + category summary
+  - Tool calls: Top 10 bar chart
+- Click outside to dismiss (with fade animation), click icon to reopen
+- Global hotkey `Cmd+Shift+C` to toggle panel
+- Right-click menu bar icon for quick actions (Dashboard / Chat / Quit)
 
 ## Sample Output
 
@@ -150,3 +185,9 @@ All data is read from local `~/.claude/` files. Nothing is sent over the network
 | Tool calls | `tool_use` blocks in assistant messages |
 | Token usage | `usage` field in assistant messages |
 | Git changes | `git log --numstat` in project directory |
+
+## Buy cc Some Tokens
+
+If this tool helps you, feel free to buy cc some tokens :)
+
+<img src="docs/donate.jpg" width="200" alt="WeChat Donation">
