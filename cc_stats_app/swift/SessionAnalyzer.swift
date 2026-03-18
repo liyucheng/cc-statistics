@@ -176,48 +176,79 @@ class SessionAnalyzer {
     }
 
     private static func calculateDuration(_ messages: [Message]) -> DurationResult {
-        let timestamped = messages.filter { $0.timestamp != nil }
-        guard timestamped.count >= 2,
-              let firstTime = timestamped.first?.timestamp,
-              let lastTime = timestamped.last?.timestamp else {
+        // 分类带时间戳的消息：user_real / user_tool / assistant
+        struct TimedMsg {
+            let ts: Date
+            let kind: String  // "user_real", "user_tool", "assistant"
+        }
+
+        var timedMsgs: [TimedMsg] = []
+        for msg in messages {
+            guard let ts = msg.timestamp else { continue }
+            if msg.role == "user" {
+                // tool_result 内容包含 tool_result 关键字
+                let isTool = msg.content.contains("tool_result")
+                timedMsgs.append(TimedMsg(ts: ts, kind: isTool ? "user_tool" : "user_real"))
+            } else if msg.role == "assistant" {
+                timedMsgs.append(TimedMsg(ts: ts, kind: "assistant"))
+            } else if msg.role == "tool_result" {
+                timedMsgs.append(TimedMsg(ts: ts, kind: "user_tool"))
+            }
+        }
+
+        guard timedMsgs.count >= 2 else {
             return DurationResult(total: 0, aiProcessing: 0, userActive: 0)
         }
 
-        let totalDuration = lastTime.timeIntervalSince(firstTime)
+        let totalDuration = timedMsgs.last!.ts.timeIntervalSince(timedMsgs.first!.ts)
 
-        // AI processing time: sum of intervals from user message to next assistant message
-        var aiProcessingTime: TimeInterval = 0
-        for i in 0..<(timestamped.count - 1) {
-            let current = timestamped[i]
-            let next = timestamped[i + 1]
-            if current.role == "user" && next.role == "assistant",
-               let currentTime = current.timestamp,
-               let nextTime = next.timestamp {
-                aiProcessingTime += nextTime.timeIntervalSince(currentTime)
+        // 按轮次切分：每遇到 user_real 开启新轮
+        // AI 时长 = 每轮从 user_real 到最后一条 assistant/user_tool 的时间
+        // 用户时长 = 上一轮最后响应到本轮 user_real 的间隔（< 5分钟才计入）
+        var aiTotal: TimeInterval = 0
+        var userTotal: TimeInterval = 0
+
+        var turnStart: Date? = nil
+        var turnLastAI: Date? = nil
+        var lastAIEnd: Date? = nil
+
+        for msg in timedMsgs {
+            if msg.kind == "user_real" {
+                // 结算上一轮的 AI 时长
+                if let start = turnStart, let lastAI = turnLastAI {
+                    aiTotal += lastAI.timeIntervalSince(start)
+                }
+
+                // 计算用户时长（上一轮 AI 结束 → 本轮 user_real）
+                if let end = lastAIEnd {
+                    let gap = msg.ts.timeIntervalSince(end)
+                    if gap > 0 && gap <= idleThreshold {
+                        userTotal += gap
+                    }
+                }
+
+                // 更新上一轮终点
+                if let lastAI = turnLastAI {
+                    lastAIEnd = lastAI
+                }
+
+                turnStart = msg.ts
+                turnLastAI = nil
+            } else {
+                // assistant 或 user_tool，都算 AI 处理中
+                turnLastAI = msg.ts
             }
         }
 
-        // User active time: gaps from assistant's last reply to next user message (review/coding time)
-        // Only count gaps < idle threshold (5 min)
-        var userActiveTime: TimeInterval = 0
-        for i in 0..<(timestamped.count - 1) {
-            let current = timestamped[i]
-            let next = timestamped[i + 1]
-            // Only count assistant → user transitions (user thinking/reviewing time)
-            if current.role == "assistant" && next.role == "user",
-               let currentTime = current.timestamp,
-               let nextTime = next.timestamp {
-                let gap = nextTime.timeIntervalSince(currentTime)
-                if gap < idleThreshold && gap > 0 {
-                    userActiveTime += gap
-                }
-            }
+        // 结算最后一轮
+        if let start = turnStart, let lastAI = turnLastAI {
+            aiTotal += lastAI.timeIntervalSince(start)
         }
 
         return DurationResult(
             total: totalDuration,
-            aiProcessing: aiProcessingTime,
-            userActive: userActiveTime
+            aiProcessing: aiTotal,
+            userActive: userTotal
         )
     }
 
