@@ -233,6 +233,59 @@ def generate_report(period: str = "week") -> str:
             pc = _estimate_cost(pm)
             lines.append(f"| {proj_name} | {len(stats_list)} | {pm.user_message_count} | {_fmt_cost(pc)} |")
 
+    # 对比上一周期
+    prev_since = since - timedelta(days=days)
+    prev_stats: list[SessionStats] = []
+    for f in jsonl_files:
+        try:
+            session = parse_jsonl(f)
+            stats_item = analyze_session(session)
+            if stats_item.end_time and prev_since <= stats_item.end_time < since:
+                prev_stats.append(stats_item)
+        except Exception:
+            continue
+
+    if prev_stats:
+        prev_merged = merge_stats(prev_stats) if len(prev_stats) > 1 else prev_stats[0]
+        prev_cost = _estimate_cost(prev_merged)
+
+        def _delta(curr, prev, fmt_fn=str):
+            if prev == 0:
+                return "—"
+            pct = (curr - prev) / prev * 100
+            sign = "+" if pct >= 0 else ""
+            return f"{fmt_fn(curr)} ({sign}{pct:.0f}%)"
+
+        prev_title = f"上{title[0]}对比" if "周" in title or "月" in title else "Previous Period"
+        lines += [
+            f"",
+            f"## {prev_title}",
+            f"",
+            f"| 指标 | 本{title[0]} | 上{title[0]} | 变化 |",
+            f"|------|------|------|------|",
+            f"| 会话 | {len(all_stats)} | {len(prev_stats)} | {_delta(len(all_stats), len(prev_stats))} |",
+            f"| 指令 | {merged.user_message_count} | {prev_merged.user_message_count} | {_delta(merged.user_message_count, prev_merged.user_message_count)} |",
+            f"| Token | {_fmt_tokens(merged.token_usage.total)} | {_fmt_tokens(prev_merged.token_usage.total)} | {_delta(merged.token_usage.total, prev_merged.token_usage.total, _fmt_tokens)} |",
+            f"| 费用 | {_fmt_cost(cost)} | {_fmt_cost(prev_cost)} | {_delta(cost, prev_cost, _fmt_cost)} |",
+            f"| 代码新增 | +{merged.total_added} | +{prev_merged.total_added} | {_delta(merged.total_added, prev_merged.total_added)} |",
+        ]
+
+    # 成本预测
+    active_days = len([d for d in daily_lines if d])  # 有数据的天数
+    if active_days > 0 and cost > 0:
+        daily_avg = cost / active_days
+        month_projection = daily_avg * 30
+        lines += [
+            f"",
+            f"## 成本预测",
+            f"",
+            f"| 指标 | 数值 |",
+            f"|------|------|",
+            f"| 日均费用 | {_fmt_cost(daily_avg)} |",
+            f"| 月度预测 | {_fmt_cost(month_projection)} |",
+            f"| 活跃天数 | {active_days}/{days} 天 |",
+        ]
+
     # 效率指标
     total_tokens = merged.token_usage.total
     total_code = merged.total_added + merged.total_removed
