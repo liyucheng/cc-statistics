@@ -128,4 +128,8 @@ enum L10n {
     }
     static var alertDaily: String { isChinese ? "单日" : "Daily" }
     static var alertWeekly: String { isChinese ? "每周" : "Weekly" }
+
+    // MARK: - Update
+    static var newVersion: String { isChinese ? "发现新版本" : "New version" }
+    static var updateNow: String { isChinese ? "立即更新" : "Update" }
 }

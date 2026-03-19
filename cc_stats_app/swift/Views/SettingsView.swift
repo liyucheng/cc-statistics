@@ -12,6 +12,8 @@ struct SettingsView: View {
     @State private var theme: String = "auto"
     @State private var dailyCostLimit: String = ""
     @State private var weeklyCostLimit: String = ""
+    @State private var latestVersion: String?
+    @State private var checkingUpdate: Bool = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -111,11 +113,37 @@ struct SettingsView: View {
                                 Text("CC Statistics")
                                     .font(.system(size: 12, weight: .semibold))
                                     .foregroundColor(Theme.textPrimary)
-                                Text("v0.5.1")
+                                Text("v\(currentVersion)")
                                     .font(.system(size: 10))
                                     .foregroundColor(Theme.textTertiary)
                             }
                             Spacer()
+
+                            if let latest = latestVersion, latest != currentVersion {
+                                Button {
+                                    NSWorkspace.shared.open(URL(string: "https://github.com/androidZzT/cc-statistics/releases/latest")!)
+                                } label: {
+                                    HStack(spacing: 3) {
+                                        Image(systemName: "arrow.up.circle.fill")
+                                            .font(.system(size: 9))
+                                        Text("v\(latest)")
+                                            .font(.system(size: 9, weight: .semibold))
+                                    }
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                            .fill(Theme.green)
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            } else if checkingUpdate {
+                                ProgressView()
+                                    .scaleEffect(0.5)
+                                    .frame(width: 16, height: 16)
+                            }
+
                             Button {
                                 NSWorkspace.shared.open(URL(string: "https://github.com/androidZzT/cc-statistics")!)
                             } label: {
@@ -136,6 +164,7 @@ struct SettingsView: View {
         .background(Theme.background)
         .onAppear {
             loadSettings()
+            checkForUpdate()
         }
         .onChange(of: launchAtLogin) { newValue in
             toggleLaunchAtLogin(newValue)
@@ -243,6 +272,28 @@ struct SettingsView: View {
                     .fill(Theme.cardBackground)
             )
         }
+    }
+
+    // MARK: - Version
+
+    private var currentVersion: String { "0.6.1" }
+
+    private func checkForUpdate() {
+        guard !checkingUpdate else { return }
+        checkingUpdate = true
+
+        // 查询 PyPI 最新版本
+        guard let url = URL(string: "https://pypi.org/pypi/cc-statistics/json") else { return }
+        URLSession.shared.dataTask(with: url) { data, _, error in
+            defer { DispatchQueue.main.async { checkingUpdate = false } }
+            guard let data = data, error == nil,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let info = json["info"] as? [String: Any],
+                  let version = info["version"] as? String else { return }
+            DispatchQueue.main.async {
+                latestVersion = version
+            }
+        }.resume()
     }
 
     // MARK: - Settings Logic
