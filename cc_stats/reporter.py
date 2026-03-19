@@ -233,6 +233,39 @@ def generate_report(period: str = "week") -> str:
             pc = _estimate_cost(pm)
             lines.append(f"| {proj_name} | {len(stats_list)} | {pm.user_message_count} | {_fmt_cost(pc)} |")
 
+    # 效率指标
+    total_tokens = merged.token_usage.total
+    total_code = merged.total_added + merged.total_removed
+    avg_tokens_per_msg = total_tokens // max(merged.user_message_count, 1)
+    code_per_1k_token = round(total_code / max(total_tokens / 1000, 1), 2)
+    active_secs = merged.active_duration.total_seconds()
+    ai_secs = merged.ai_duration.total_seconds()
+    ai_ratio = round(ai_secs / max(active_secs, 1) * 100)
+
+    # 效率评分 (0-100)
+    # 代码产出 (40分): code_per_1k_token, 0.5以上满分
+    code_score = min(40, int(code_per_1k_token / 0.5 * 40))
+    # 指令精准 (30分): avg_tokens_per_msg 越低越好, 50K以下满分
+    precision_score = max(0, min(30, int((1 - min(avg_tokens_per_msg, 200_000) / 200_000) * 30)))
+    # AI利用率 (30分): 70%以上满分
+    util_score = min(30, int(ai_ratio / 70 * 30))
+    total_score = code_score + precision_score + util_score
+
+    grade = "S" if total_score >= 90 else "A" if total_score >= 75 else "B" if total_score >= 60 else "C" if total_score >= 40 else "D"
+
+    lines += [
+        f"",
+        f"## 效率评分",
+        f"",
+        f"**{grade} ({total_score}/100)**",
+        f"",
+        f"| 维度 | 数值 | 得分 |",
+        f"|------|------|------|",
+        f"| 代码产出率 | {code_per_1k_token} 行/K Token | {code_score}/40 |",
+        f"| 指令精准度 | {_fmt_tokens(avg_tokens_per_msg)} Token/条 | {precision_score}/30 |",
+        f"| AI 利用率 | {ai_ratio}% | {util_score}/30 |",
+    ]
+
     lines += [
         f"",
         f"---",

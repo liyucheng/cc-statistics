@@ -232,4 +232,29 @@ def format_stats(stats: SessionStats, session_count: int = 1) -> str:
             )
     lines.append("")
 
+    # ⑥ 效率评分
+    total_tokens = stats.token_usage.total
+    total_code = stats.total_added + stats.total_removed
+    if total_tokens > 0 and stats.user_message_count > 0:
+        avg_tokens_per_msg = total_tokens // stats.user_message_count
+        code_per_1k = round(total_code / max(total_tokens / 1000, 1), 2)
+        active_secs = stats.active_duration.total_seconds()
+        ai_secs = stats.ai_duration.total_seconds()
+        ai_ratio = round(ai_secs / max(active_secs, 1) * 100)
+
+        code_score = min(40, int(code_per_1k / 0.5 * 40))
+        precision_score = max(0, min(30, int((1 - min(avg_tokens_per_msg, 200_000) / 200_000) * 30)))
+        util_score = min(30, int(ai_ratio / 70 * 30))
+        total_score = code_score + precision_score + util_score
+        grade = "S" if total_score >= 90 else "A" if total_score >= 75 else "B" if total_score >= 60 else "C" if total_score >= 40 else "D"
+
+        grade_color = _green if grade in ("S", "A") else _yellow if grade == "B" else _red
+        lines.append(f"  {_bold('⑥ 效率评分')}")
+        lines.append("─" * 60)
+        lines.append(f"  评分: {grade_color(f'{grade} ({total_score}/100)')}")
+        lines.append(f"  代码产出: {_fmt_tokens(total_code)} 行 / {_fmt_tokens(total_tokens)} Token = {_cyan(f'{code_per_1k} 行/K')}")
+        lines.append(f"  指令精准: {_fmt_tokens(avg_tokens_per_msg)} Token/条")
+        lines.append(f"  AI 利用率: {ai_ratio}%")
+        lines.append("")
+
     return "\n".join(lines)
