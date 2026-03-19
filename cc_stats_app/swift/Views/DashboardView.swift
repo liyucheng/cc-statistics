@@ -161,6 +161,7 @@ struct DashboardView: View {
                         tokenUsageSection(stats: stats)
                         toolCallsSection(stats: stats)
                         efficiencySection(stats: stats)
+                        costPredictionSection(stats: stats)
                         processSection
                     }
                     .padding(.horizontal, 16)
@@ -856,6 +857,67 @@ struct DashboardView: View {
                 .frame(width: 35, alignment: .trailing)
         }
         .frame(height: 16)
+    }
+
+    // MARK: - Cost Prediction
+
+    private func costPredictionSection(stats: SessionStats) -> some View {
+        let activeDays = viewModel.dailyStats.filter { $0.cost > 0 }.count
+        let cost = stats.estimatedCost
+        let dailyAvg = activeDays > 0 ? cost / Double(activeDays) : 0
+        let monthProjection = dailyAvg * 30
+
+        return GlassCard {
+            VStack(alignment: .leading, spacing: 8) {
+                SectionHeader(icon: "chart.line.uptrend.xyaxis", title: L10n.costPrediction, accentColor: Theme.amber)
+
+                if activeDays > 0 && cost > 0 {
+                    HStack(spacing: 16) {
+                        VStack(spacing: 4) {
+                            Text(L10n.dailyAvg)
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundColor(Theme.textTertiary)
+                            Text(CostEstimator.formatCost(dailyAvg))
+                                .font(.system(size: 16, weight: .bold, design: .rounded))
+                                .foregroundColor(Theme.amber)
+                        }
+                        .frame(maxWidth: .infinity)
+
+                        Rectangle()
+                            .fill(Theme.textTertiary.opacity(0.2))
+                            .frame(width: 1, height: 30)
+
+                        VStack(spacing: 4) {
+                            Text(L10n.monthProjection)
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundColor(Theme.textTertiary)
+                            Text(CostEstimator.formatCost(monthProjection))
+                                .font(.system(size: 16, weight: .bold, design: .rounded))
+                                .foregroundColor(monthProjection > 1000 ? Theme.red : Theme.green)
+                        }
+                        .frame(maxWidth: .infinity)
+
+                        Rectangle()
+                            .fill(Theme.textTertiary.opacity(0.2))
+                            .frame(width: 1, height: 30)
+
+                        VStack(spacing: 4) {
+                            Text(L10n.active)
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundColor(Theme.textTertiary)
+                            Text("\(activeDays)" + (L10n.isChinese ? "天" : "d"))
+                                .font(.system(size: 16, weight: .bold, design: .rounded))
+                                .foregroundColor(Theme.textPrimary)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                } else {
+                    Text(L10n.noData)
+                        .font(.system(size: 11))
+                        .foregroundColor(Theme.textTertiary)
+                }
+            }
+        }
     }
 
     // MARK: - Process Manager
