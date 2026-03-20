@@ -10,10 +10,7 @@ final class PanelManager: ObservableObject {
     private var closeObserver: Any?
 
     func show<Content: View>(content: Content, onClose: @escaping () -> Void) {
-        // 面板已存在：激活并显示
         if let existing = panel {
-            NSApp.activate(ignoringOtherApps: true)
-            existing.orderFront(nil)
             existing.makeKeyAndOrderFront(nil)
             return
         }
@@ -23,9 +20,6 @@ final class PanelManager: ObservableObject {
 
         let rect = NSRect(x: 0, y: 0, width: 420, height: 600)
         let newPanel = FloatingPanel(contentRect: rect)
-        newPanel.level = .normal
-        // 失去焦点自动隐藏（不是关闭，下次可以直接 orderFront）
-        newPanel.hidesOnDeactivate = true
 
         if let container = newPanel.contentView {
             container.addSubview(hostingView)
@@ -38,7 +32,6 @@ final class PanelManager: ObservableObject {
         }
 
         newPanel.positionAtRightCenter()
-        NSApp.activate(ignoringOtherApps: true)
         newPanel.makeKeyAndOrderFront(nil)
 
         closeObserver = NotificationCenter.default.addObserver(
