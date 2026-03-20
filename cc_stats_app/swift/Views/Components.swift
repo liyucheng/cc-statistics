@@ -83,6 +83,8 @@ struct StatCard: View {
     let accentColor: Color
     var helpText: String? = nil
 
+    @State private var showHelp = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 5) {
@@ -92,11 +94,9 @@ struct StatCard: View {
                 Text(title)
                     .font(.system(size: 10, weight: .medium))
                     .foregroundColor(Theme.textSecondary)
-                if let help = helpText {
-                    Image(systemName: "info.circle")
+                if helpText != nil {
+                    InfoBubble(text: helpText!, showHelp: $showHelp)
                         .font(.system(size: 8))
-                        .foregroundColor(Theme.textTertiary.opacity(0.5))
-                        .help(help)
                 }
             }
 
@@ -138,6 +138,8 @@ struct SectionHeader: View {
     var accentColor: Color = Theme.cyan
     var helpText: String? = nil
 
+    @State private var showHelp = false
+
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
@@ -149,16 +151,38 @@ struct SectionHeader: View {
                 .textCase(.uppercase)
                 .tracking(0.8)
 
-            if let help = helpText {
-                Image(systemName: "info.circle")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(Theme.textTertiary.opacity(0.6))
-                    .help(help)
+            if helpText != nil {
+                InfoBubble(text: helpText!, showHelp: $showHelp)
+                    .font(.system(size: 10))
             }
 
             Spacer()
         }
         .padding(.top, 4)
+    }
+}
+
+// MARK: - InfoBubble (点击显示小气泡)
+
+struct InfoBubble: View {
+    let text: String
+    @Binding var showHelp: Bool
+
+    var body: some View {
+        Button {
+            showHelp.toggle()
+        } label: {
+            Image(systemName: "info.circle")
+                .foregroundColor(Theme.textTertiary.opacity(0.6))
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: $showHelp, arrowEdge: .trailing) {
+            Text(text)
+                .font(.system(size: 11))
+                .foregroundColor(.primary)
+                .padding(8)
+                .fixedSize()
+        }
     }
 }
 
