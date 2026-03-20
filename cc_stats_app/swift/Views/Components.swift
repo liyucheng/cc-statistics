@@ -81,6 +81,9 @@ struct StatCard: View {
     let title: String
     let value: String
     let accentColor: Color
+    var helpText: String? = nil
+
+    @State private var showHelp = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -91,6 +94,25 @@ struct StatCard: View {
                 Text(title)
                     .font(.system(size: 10, weight: .medium))
                     .foregroundColor(Theme.textSecondary)
+                if helpText != nil {
+                    Button {
+                        showHelp.toggle()
+                    } label: {
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 8))
+                            .foregroundColor(Theme.textTertiary.opacity(0.5))
+                    }
+                    .buttonStyle(.plain)
+                    .popover(isPresented: $showHelp, arrowEdge: .bottom) {
+                        Text(helpText ?? "")
+                            .font(.system(size: 11))
+                            .foregroundColor(Theme.textPrimary)
+                            .padding(12)
+                            .frame(maxWidth: 260)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .background(Theme.cardBackground)
+                    }
+                }
             }
 
             Text(value)
@@ -129,6 +151,9 @@ struct SectionHeader: View {
     let icon: String
     let title: String
     var accentColor: Color = Theme.cyan
+    var helpText: String? = nil
+
+    @State private var showHelp = false
 
     var body: some View {
         HStack(spacing: 6) {
@@ -140,6 +165,27 @@ struct SectionHeader: View {
                 .foregroundColor(Theme.textPrimary)
                 .textCase(.uppercase)
                 .tracking(0.8)
+
+            if helpText != nil {
+                Button {
+                    showHelp.toggle()
+                } label: {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(Theme.textTertiary.opacity(0.6))
+                }
+                .buttonStyle(.plain)
+                .popover(isPresented: $showHelp, arrowEdge: .bottom) {
+                    Text(helpText ?? "")
+                        .font(.system(size: 11))
+                        .foregroundColor(Theme.textPrimary)
+                        .padding(12)
+                        .frame(maxWidth: 280)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .background(Theme.cardBackground)
+                }
+            }
+
             Spacer()
         }
         .padding(.top, 4)

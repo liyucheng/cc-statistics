@@ -372,25 +372,29 @@ struct DashboardView: View {
                 icon: "terminal.fill",
                 title: L10n.sessions,
                 value: "\(stats.sessionCount)",
-                accentColor: Theme.cyan
+                accentColor: Theme.cyan,
+                helpText: L10n.helpSessions
             )
             StatCard(
                 icon: "text.bubble.fill",
                 title: L10n.instructions,
                 value: "\(stats.userInstructions)",
-                accentColor: Theme.purple
+                accentColor: Theme.purple,
+                helpText: L10n.helpInstructions
             )
             StatCard(
                 icon: "clock.fill",
                 title: L10n.duration,
                 value: formatDuration(stats.totalDuration),
-                accentColor: Theme.green
+                accentColor: Theme.green,
+                helpText: L10n.helpDuration
             )
             StatCard(
                 icon: "dollarsign.circle.fill",
                 title: L10n.estimatedCost,
                 value: CostEstimator.formatCost(stats.estimatedCost),
-                accentColor: Theme.amber
+                accentColor: Theme.amber,
+                helpText: L10n.helpCost
             )
         }
     }
@@ -400,7 +404,7 @@ struct DashboardView: View {
     private func toolCallsSection(stats: SessionStats) -> some View {
         GlassCard {
             VStack(alignment: .leading, spacing: 8) {
-                SectionHeader(icon: "hammer.fill", title: L10n.toolCalls, accentColor: Theme.cyan)
+                SectionHeader(icon: "hammer.fill", title: L10n.toolCalls, accentColor: Theme.cyan, helpText: L10n.helpToolCalls)
 
                 let sortedTools = stats.toolCalls
                     .sorted(by: { $0.value > $1.value })
@@ -427,7 +431,7 @@ struct DashboardView: View {
     private func developmentTimeSection(stats: SessionStats) -> some View {
         GlassCard {
             VStack(alignment: .leading, spacing: 10) {
-                SectionHeader(icon: "chart.pie.fill", title: L10n.devTime, accentColor: Theme.green)
+                SectionHeader(icon: "chart.pie.fill", title: L10n.devTime, accentColor: Theme.green, helpText: L10n.helpDevTime)
 
                 HStack(spacing: 20) {
                     // Activity ring: AI processing / active time (AI + user)
@@ -481,7 +485,7 @@ struct DashboardView: View {
         GlassCard {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    SectionHeader(icon: "chevron.left.forwardslash.chevron.right", title: L10n.codeChanges, accentColor: Theme.pink)
+                    SectionHeader(icon: "chevron.left.forwardslash.chevron.right", title: L10n.codeChanges, accentColor: Theme.pink, helpText: L10n.helpCodeChanges)
                     Spacer()
                     let totalAdd = stats.gitAdditions + stats.codeChanges.reduce(0) { $0 + $1.additions }
                     let totalDel = stats.gitDeletions + stats.codeChanges.reduce(0) { $0 + $1.deletions }
@@ -535,7 +539,7 @@ struct DashboardView: View {
     private func tokenUsageSection(stats: SessionStats) -> some View {
         GlassCard {
             VStack(alignment: .leading, spacing: 10) {
-                SectionHeader(icon: "circle.hexagonpath.fill", title: L10n.tokenUsage, accentColor: Theme.amber)
+                SectionHeader(icon: "circle.hexagonpath.fill", title: L10n.tokenUsage, accentColor: Theme.amber, helpText: L10n.helpTokenUsage)
 
                 let tokenEntries = stats.tokenUsage.sorted(by: { $0.value.totalTokens > $1.value.totalTokens })
 
@@ -753,7 +757,7 @@ struct DashboardView: View {
     private func efficiencySection(stats: SessionStats) -> some View {
         GlassCard {
             VStack(alignment: .leading, spacing: 10) {
-                SectionHeader(icon: "gauge.with.dots.needle.33percent", title: L10n.efficiency, accentColor: Theme.amber)
+                SectionHeader(icon: "gauge.with.dots.needle.33percent", title: L10n.efficiency, accentColor: Theme.amber, helpText: L10n.helpEfficiency)
 
                 // Grade badge
                 HStack(spacing: 12) {
@@ -869,7 +873,7 @@ struct DashboardView: View {
 
         return GlassCard {
             VStack(alignment: .leading, spacing: 8) {
-                SectionHeader(icon: "chart.line.uptrend.xyaxis", title: L10n.costPrediction, accentColor: Theme.amber)
+                SectionHeader(icon: "chart.line.uptrend.xyaxis", title: L10n.costPrediction, accentColor: Theme.amber, helpText: L10n.helpCostPrediction)
 
                 if activeDays > 0 && cost > 0 {
                     HStack(spacing: 16) {

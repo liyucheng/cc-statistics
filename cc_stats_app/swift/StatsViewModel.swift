@@ -202,7 +202,7 @@ final class StatsViewModel: ObservableObject {
                 }
             }
 
-            let stats = SessionAnalyzer.analyze(sessions: filteredSessions)
+            let stats = SessionAnalyzer.analyze(sessions: filteredSessions, since: currentFilter.startDate)
             // 会话列表不受时间筛选影响，按最近活跃时间排序
             let recent = allSessions
                 .sorted(by: { ($0.endTime ?? .distantPast) > ($1.endTime ?? .distantPast) })
