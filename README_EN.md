@@ -11,6 +11,10 @@ Claude Code session statistics tool — extract AI coding metrics from local `~/
 
 <img src="docs/screenshot.png" width="420" alt="CC Stats Dashboard">
 
+### CLI Demo
+
+<img src="docs/demo.gif" width="600" alt="CC Stats CLI Demo">
+
 ## Highlights
 
 - **Cost Estimation** — Auto-calculate costs based on Opus / Sonnet / Haiku / GPT-4o pricing

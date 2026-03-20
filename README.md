@@ -11,6 +11,10 @@ Claude Code 会话统计工具 — 从本地 `~/.claude/` 数据中提取 AI Cod
 
 <img src="docs/screenshot.png" width="420" alt="CC Stats Dashboard">
 
+### CLI Demo
+
+<img src="docs/demo.gif" width="600" alt="CC Stats CLI Demo">
+
 ## 核心亮点
 
 - **费用估算** — 根据 Opus / Sonnet / Haiku / GPT-4o 定价自动计算预估花费
