@@ -386,7 +386,8 @@ struct ConversationView: View {
             startTime: session.startTime
         )
 
-        // 渲染为图片
+        // 渲染为高清图片 (2x)
+        let scale: CGFloat = 2.0
         let cardWidth: CGFloat = 520
         let hostingView = NSHostingView(rootView: cardView.frame(width: cardWidth))
         hostingView.frame = NSRect(x: 0, y: 0, width: cardWidth, height: 10000)
@@ -395,8 +396,28 @@ struct ConversationView: View {
         let fittingSize = hostingView.fittingSize
         hostingView.frame = NSRect(x: 0, y: 0, width: cardWidth, height: fittingSize.height)
 
-        guard let bitmapRep = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds) else { return }
-        hostingView.cacheDisplay(in: hostingView.bounds, to: bitmapRep)
+        let pixelWidth = Int(cardWidth * scale)
+        let pixelHeight = Int(fittingSize.height * scale)
+
+        guard let bitmapRep = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: pixelWidth,
+            pixelsHigh: pixelHeight,
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bytesPerRow: 0,
+            bitsPerPixel: 0
+        ) else { return }
+
+        bitmapRep.size = NSSize(width: cardWidth, height: fittingSize.height)
+
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmapRep)
+        hostingView.displayIgnoringOpacity(hostingView.bounds, in: NSGraphicsContext.current!)
+        NSGraphicsContext.restoreGraphicsState()
 
         guard let pngData = bitmapRep.representation(using: .png, properties: [:]) else { return }
 
