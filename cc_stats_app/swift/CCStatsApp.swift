@@ -21,8 +21,9 @@ final class PanelManager: ObservableObject {
 
         let rect = NSRect(x: 0, y: 0, width: 420, height: 600)
         let newPanel = FloatingPanel(contentRect: rect)
-        // 对话窗口用普通级别，点击其他窗口时可以到后面
+        // 对话窗口：失去焦点自动关闭
         newPanel.level = .normal
+        newPanel.hidesOnDeactivate = true
 
         if let container = newPanel.contentView {
             container.addSubview(hostingView)
@@ -47,16 +48,16 @@ final class PanelManager: ObservableObject {
             self?.panel = nil
         }
 
+        // 失去焦点时自动关闭
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.didResignKeyNotification,
+            object: newPanel,
+            queue: .main
+        ) { [weak self] _ in
+            self?.panel?.close()
+        }
+
         self.panel = newPanel
-    }
-
-    var isVisible: Bool {
-        panel?.isVisible ?? false
-    }
-
-    func bringToFront() {
-        NSApp.activate(ignoringOtherApps: true)
-        panel?.makeKeyAndOrderFront(nil)
     }
 
     func close() {
@@ -583,36 +584,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Conversation Panel
 
     private func observeConversationPanel() {
-        // 设置拉到前面的回调
-        viewModel.bringConversationToFront = { [weak self] in
-            self?.panelManager.bringToFront()
-        }
-
         viewModel.$showConversationPanel
             .receive(on: DispatchQueue.main)
             .sink { [weak self] show in
                 guard let self = self else { return }
                 if show {
-                    // 如果面板已存在，拉到前面；否则新建
-                    if self.panelManager.isVisible {
-                        self.panelManager.bringToFront()
-                    } else {
-                        self.panelManager.show(
-                            content: ConversationView(
-                                sessions: self.viewModel.recentSessions,
-                                onClose: {
-                                    Task { @MainActor in
-                                        self.viewModel.showConversationPanel = false
-                                    }
-                                }
-                            ),
+                    self.panelManager.show(
+                        content: ConversationView(
+                            sessions: self.viewModel.recentSessions,
                             onClose: {
                                 Task { @MainActor in
                                     self.viewModel.showConversationPanel = false
                                 }
                             }
-                        )
-                    }
+                        ),
+                        onClose: {
+                            Task { @MainActor in
+                                self.viewModel.showConversationPanel = false
+                            }
+                        }
+                    )
                 } else {
                     self.panelManager.close()
                 }
