@@ -640,112 +640,162 @@ struct MarkdownContentView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            ForEach(Array(parseSegments().enumerated()), id: \.offset) { _, segment in
+            ForEach(Array(parseMdSegments(text).enumerated()), id: \.offset) { _, segment in
                 switch segment {
+                case .heading(let level, let title):
+                    let fontSize: CGFloat = level == 1 ? 16 : level == 2 ? 14 : 13
+                    Text(title)
+                        .font(.system(size: fontSize, weight: .bold))
+                        .foregroundColor(Color.white.opacity(0.92))
+                        .padding(.top, level == 1 ? 4 : 2)
                 case .code(let lang, let code):
-                    codeBlockView(language: lang, code: code)
+                    VStack(alignment: .leading, spacing: 0) {
+                        if !lang.isEmpty {
+                            Text(lang)
+                                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                                .foregroundColor(Color.white.opacity(0.4))
+                                .padding(.horizontal, 10)
+                                .padding(.top, 6)
+                                .padding(.bottom, 2)
+                        }
+                        Text(code)
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundColor(Color(hex: "E0E0E0"))
+                            .lineSpacing(2)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, lang.isEmpty ? 8 : 4)
+                            .padding(.bottom, 4)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(Color.white.opacity(0.06))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
+                    )
+                case .table(let headers, let rows):
+                    MdTableView(headers: headers, rows: rows, textColor: Color.white.opacity(0.88), headerColor: Color.white.opacity(0.6), borderColor: Color.white.opacity(0.15))
                 case .text(let md):
-                    if !md.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        markdownTextView(md)
+                    let trimmed = md.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !trimmed.isEmpty {
+                        if let attr = try? AttributedString(markdown: trimmed, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
+                            Text(attr)
+                                .font(.system(size: 12))
+                                .foregroundColor(Color.white.opacity(0.88))
+                                .lineSpacing(3)
+                        } else {
+                            Text(trimmed)
+                                .font(.system(size: 12))
+                                .foregroundColor(Color.white.opacity(0.88))
+                                .lineSpacing(3)
+                        }
                     }
                 }
             }
         }
         .fixedSize(horizontal: false, vertical: true)
     }
+}
 
-    private func markdownTextView(_ md: String) -> some View {
-        Group {
-            if let attr = try? AttributedString(markdown: md, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
-                Text(attr)
-                    .font(.system(size: 12))
-                    .foregroundColor(Color.white.opacity(0.88))
-                    .lineSpacing(3)
+// MARK: - Shared Markdown Parser
+
+enum MdSegment {
+    case text(String)
+    case code(lang: String, code: String)
+    case heading(level: Int, text: String)
+    case table(headers: [String], rows: [[String]])
+}
+
+func parseMdSegments(_ text: String) -> [MdSegment] {
+    var segments: [MdSegment] = []
+    let lines = text.components(separatedBy: "\n")
+    var currentText = ""
+    var inCodeBlock = false
+    var codeLang = ""
+    var codeLines: [String] = []
+    var tableHeaders: [String] = []
+    var tableRows: [[String]] = []
+    var inTable = false
+
+    func flushText() {
+        if !currentText.isEmpty {
+            segments.append(.text(currentText))
+            currentText = ""
+        }
+    }
+
+    func flushTable() {
+        if inTable && !tableHeaders.isEmpty {
+            segments.append(.table(headers: tableHeaders, rows: tableRows))
+            tableHeaders = []
+            tableRows = []
+            inTable = false
+        }
+    }
+
+    func parseTableRow(_ line: String) -> [String] {
+        return line.split(separator: "|", omittingEmptySubsequences: false)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+    }
+
+    func isSeparatorRow(_ line: String) -> Bool {
+        let cleaned = line.replacingOccurrences(of: " ", with: "")
+        return cleaned.contains("|") && cleaned.allSatisfy { $0 == "|" || $0 == "-" || $0 == ":" }
+    }
+
+    for line in lines {
+        if line.hasPrefix("```") && !inCodeBlock {
+            flushText()
+            flushTable()
+            inCodeBlock = true
+            codeLang = String(line.dropFirst(3)).trimmingCharacters(in: .whitespaces)
+            codeLines = []
+        } else if line.hasPrefix("```") && inCodeBlock {
+            segments.append(.code(lang: codeLang, code: codeLines.joined(separator: "\n")))
+            inCodeBlock = false
+        } else if inCodeBlock {
+            codeLines.append(line)
+        } else if line.contains("|") && !inCodeBlock {
+            let cells = parseTableRow(line)
+            if isSeparatorRow(line) {
+                // 分隔行，跳过
+                continue
+            } else if !inTable {
+                flushText()
+                tableHeaders = cells
+                tableRows = []
+                inTable = true
             } else {
-                Text(md)
-                    .font(.system(size: 12))
-                    .foregroundColor(Color.white.opacity(0.88))
-                    .lineSpacing(3)
+                tableRows.append(cells)
             }
-        }
-    }
-
-    private func codeBlockView(language: String, code: String) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if !language.isEmpty {
-                Text(language)
-                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                    .foregroundColor(Color.white.opacity(0.4))
-                    .padding(.horizontal, 10)
-                    .padding(.top, 6)
-                    .padding(.bottom, 2)
-            }
-            Text(code)
-                .font(.system(size: 11, weight: .regular, design: .monospaced))
-                .foregroundColor(Color(hex: "E0E0E0"))
-                .lineSpacing(2)
-                .padding(.horizontal, 10)
-                .padding(.vertical, language.isEmpty ? 8 : 4)
-                .padding(.bottom, 4)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(Color.white.opacity(0.06))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
-        )
-    }
-
-    enum Segment {
-        case text(String)
-        case code(lang: String, code: String)
-    }
-
-    private func parseSegments() -> [Segment] {
-        var segments: [Segment] = []
-        let lines = text.components(separatedBy: "\n")
-        var currentText = ""
-        var inCodeBlock = false
-        var codeLang = ""
-        var codeLines: [String] = []
-
-        for line in lines {
-            if line.hasPrefix("```") && !inCodeBlock {
-                // 进入代码块
-                if !currentText.isEmpty {
-                    segments.append(.text(currentText))
-                    currentText = ""
+        } else {
+            flushTable()
+            if line.hasPrefix("#") {
+                flushText()
+                var level = 0
+                for ch in line { if ch == "#" { level += 1 } else { break } }
+                let title = String(line.dropFirst(level)).trimmingCharacters(in: .whitespaces)
+                if !title.isEmpty {
+                    segments.append(.heading(level: min(level, 4), text: title))
                 }
-                inCodeBlock = true
-                codeLang = String(line.dropFirst(3)).trimmingCharacters(in: .whitespaces)
-                codeLines = []
-            } else if line.hasPrefix("```") && inCodeBlock {
-                // 结束代码块
-                segments.append(.code(lang: codeLang, code: codeLines.joined(separator: "\n")))
-                inCodeBlock = false
-                codeLang = ""
-                codeLines = []
-            } else if inCodeBlock {
-                codeLines.append(line)
             } else {
                 if !currentText.isEmpty { currentText += "\n" }
                 currentText += line
             }
         }
-
-        // 处理未闭合
-        if inCodeBlock {
-            segments.append(.code(lang: codeLang, code: codeLines.joined(separator: "\n")))
-        }
-        if !currentText.isEmpty {
-            segments.append(.text(currentText))
-        }
-
-        return segments
     }
+
+    if inCodeBlock {
+        segments.append(.code(lang: codeLang, code: codeLines.joined(separator: "\n")))
+    }
+    flushTable()
+    if !currentText.isEmpty {
+        segments.append(.text(currentText))
+    }
+    return segments
 }
 
 // MARK: - Conversation Markdown View (面板用，跟随 Theme 颜色)
@@ -755,8 +805,14 @@ struct ConversationMarkdownView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            ForEach(Array(parseSegments().enumerated()), id: \.offset) { _, segment in
+            ForEach(Array(parseMdSegments(text).enumerated()), id: \.offset) { _, segment in
                 switch segment {
+                case .heading(let level, let title):
+                    let fontSize: CGFloat = level == 1 ? 15 : level == 2 ? 13 : 12
+                    Text(title)
+                        .font(.system(size: fontSize, weight: .bold))
+                        .foregroundColor(Theme.textPrimary)
+                        .padding(.top, level == 1 ? 4 : 2)
                 case .code(let lang, let code):
                     VStack(alignment: .leading, spacing: 0) {
                         if !lang.isEmpty {
@@ -784,6 +840,8 @@ struct ConversationMarkdownView: View {
                         RoundedRectangle(cornerRadius: 5, style: .continuous)
                             .strokeBorder(Theme.border.opacity(0.3), lineWidth: 0.5)
                     )
+                case .table(let headers, let rows):
+                    MdTableView(headers: headers, rows: rows, textColor: Theme.textPrimary, headerColor: Theme.textSecondary, borderColor: Theme.border)
                 case .text(let md):
                     let trimmed = md.trimmingCharacters(in: .whitespacesAndNewlines)
                     if !trimmed.isEmpty {
@@ -805,48 +863,61 @@ struct ConversationMarkdownView: View {
             }
         }
     }
+}
 
-    enum Segment {
-        case text(String)
-        case code(lang: String, code: String)
-    }
+// MARK: - Markdown Table View
 
-    private func parseSegments() -> [Segment] {
-        var segments: [Segment] = []
-        let lines = text.components(separatedBy: "\n")
-        var currentText = ""
-        var inCodeBlock = false
-        var codeLang = ""
-        var codeLines: [String] = []
+struct MdTableView: View {
+    let headers: [String]
+    let rows: [[String]]
+    var textColor: Color = .white
+    var headerColor: Color = .gray
+    var borderColor: Color = .gray.opacity(0.3)
 
-        for line in lines {
-            if line.hasPrefix("```") && !inCodeBlock {
-                if !currentText.isEmpty {
-                    segments.append(.text(currentText))
-                    currentText = ""
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header row
+            HStack(spacing: 0) {
+                ForEach(Array(headers.enumerated()), id: \.offset) { i, header in
+                    Text(header)
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(headerColor)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 4)
+                    if i < headers.count - 1 {
+                        Rectangle().fill(borderColor).frame(width: 0.5)
+                    }
                 }
-                inCodeBlock = true
-                codeLang = String(line.dropFirst(3)).trimmingCharacters(in: .whitespaces)
-                codeLines = []
-            } else if line.hasPrefix("```") && inCodeBlock {
-                segments.append(.code(lang: codeLang, code: codeLines.joined(separator: "\n")))
-                inCodeBlock = false
-                codeLang = ""
-                codeLines = []
-            } else if inCodeBlock {
-                codeLines.append(line)
-            } else {
-                if !currentText.isEmpty { currentText += "\n" }
-                currentText += line
+            }
+            .background(borderColor.opacity(0.15))
+
+            Rectangle().fill(borderColor).frame(height: 0.5)
+
+            // Data rows
+            ForEach(Array(rows.enumerated()), id: \.offset) { ri, row in
+                HStack(spacing: 0) {
+                    ForEach(Array(row.prefix(headers.count).enumerated()), id: \.offset) { i, cell in
+                        Text(cell)
+                            .font(.system(size: 10))
+                            .foregroundColor(textColor)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                        if i < headers.count - 1 {
+                            Rectangle().fill(borderColor).frame(width: 0.5)
+                        }
+                    }
+                }
+                if ri < rows.count - 1 {
+                    Rectangle().fill(borderColor).frame(height: 0.5)
+                }
             }
         }
-
-        if inCodeBlock {
-            segments.append(.code(lang: codeLang, code: codeLines.joined(separator: "\n")))
-        }
-        if !currentText.isEmpty {
-            segments.append(.text(currentText))
-        }
-        return segments
+        .overlay(
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                .strokeBorder(borderColor, lineWidth: 0.5)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
     }
 }
