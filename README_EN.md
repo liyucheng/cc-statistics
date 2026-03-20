@@ -52,6 +52,35 @@ cc-stats --all --since 2w    # Last 2 weeks
 cc-stats sailor --last 3     # Last 3 sessions for a project
 cc-stats --report week       # Generate weekly report (Markdown)
 cc-stats --report month      # Generate monthly report
+cc-stats --compare           # Compare all projects side by side
+cc-stats --compare --since 1w # Compare projects (last week)
+```
+
+### Webhook Notifications (Feishu / DingTalk / Slack)
+
+Push daily stats summary to your team chat:
+
+```bash
+# Feishu/Lark (auto-detected)
+cc-stats --notify https://open.feishu.cn/open-apis/bot/v2/hook/xxx
+
+# DingTalk
+cc-stats --notify https://oapi.dingtalk.com/robot/send?access_token=xxx
+
+# Slack
+cc-stats --notify https://hooks.slack.com/services/xxx
+
+# Specify platform manually
+cc-stats --notify <url> --platform slack
+```
+
+Includes: instructions, active time, tokens, cost, code changes, efficiency grade.
+
+Set up daily auto-push with cron:
+
+```bash
+# Push daily report at 9pm
+0 21 * * * cc-stats --notify https://hooks.slack.com/services/xxx
 ```
 
 ### Web Dashboard (All Platforms: macOS / Windows / Linux)

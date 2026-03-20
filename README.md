@@ -52,6 +52,35 @@ cc-stats --all --since 2w    # 最近 2 周
 cc-stats sailor --last 3     # 某项目最近 3 个会话
 cc-stats --report week       # 生成周报（Markdown）
 cc-stats --report month      # 生成月报
+cc-stats --compare           # 多项目对比
+cc-stats --compare --since 1w # 最近一周项目对比
+```
+
+### Webhook 通知（飞书 / 钉钉 / Slack）
+
+将每日统计摘要推送到团队群：
+
+```bash
+# 飞书（自动检测）
+cc-stats --notify https://open.feishu.cn/open-apis/bot/v2/hook/xxx
+
+# 钉钉
+cc-stats --notify https://oapi.dingtalk.com/robot/send?access_token=xxx
+
+# Slack
+cc-stats --notify https://hooks.slack.com/services/xxx
+
+# 手动指定平台
+cc-stats --notify <url> --platform feishu
+```
+
+推送内容包括：指令数、活跃时长、Token、费用、代码变更、效率评分。
+
+配合 cron 实现每日自动推送：
+
+```bash
+# 每天 21:00 推送日报到飞书
+0 21 * * * cc-stats --notify https://open.feishu.cn/open-apis/bot/v2/hook/xxx
 ```
 
 ### Web Dashboard（全平台：macOS / Windows / Linux）
