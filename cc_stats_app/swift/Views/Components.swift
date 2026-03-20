@@ -104,13 +104,15 @@ struct StatCard: View {
                     }
                     .buttonStyle(.plain)
                     .popover(isPresented: $showHelp, arrowEdge: .bottom) {
-                        Text(helpText ?? "")
-                            .font(.system(size: 11))
-                            .foregroundColor(Theme.textPrimary)
-                            .padding(12)
-                            .frame(maxWidth: 260)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .background(Theme.cardBackground)
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(helpText ?? "")
+                                .font(.system(size: 11, weight: .regular))
+                                .lineSpacing(4)
+                        }
+                        .foregroundColor(.primary)
+                        .padding(12)
+                        .frame(width: 260, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }
@@ -176,13 +178,15 @@ struct SectionHeader: View {
                 }
                 .buttonStyle(.plain)
                 .popover(isPresented: $showHelp, arrowEdge: .bottom) {
-                    Text(helpText ?? "")
-                        .font(.system(size: 11))
-                        .foregroundColor(Theme.textPrimary)
-                        .padding(12)
-                        .frame(maxWidth: 280)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .background(Theme.cardBackground)
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(helpText ?? "")
+                            .font(.system(size: 11, weight: .regular))
+                            .lineSpacing(4)
+                    }
+                    .foregroundColor(.primary)
+                    .padding(12)
+                    .frame(width: 280, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
