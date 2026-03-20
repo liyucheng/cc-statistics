@@ -344,7 +344,11 @@ final class StatsViewModel: ObservableObject {
     }
 
     func toggleConversationPanel() {
-        showConversationPanel.toggle()
+        // 始终设为 true，PanelManager.show 会处理已存在的情况
+        showConversationPanel = false
+        DispatchQueue.main.async {
+            self.showConversationPanel = true
+        }
     }
 
     // MARK: - Private Methods
