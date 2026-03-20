@@ -10,6 +10,8 @@ struct ConversationView: View {
     @State private var selectedSession: Session?
     @State private var toastMessage: String?
     @State private var searchText: String = ""
+    @State private var isSelectMode = false
+    @State private var selectedMessageIDs: Set<UUID> = []
 
     private var filteredSessions: [Session] {
         let base: [Session]
@@ -142,6 +144,9 @@ struct ConversationView: View {
 
         return Button {
             selectedSession = session
+            // 切换会话时退出选择模式
+            isSelectMode = false
+            selectedMessageIDs.removeAll()
 
             // Copy resume command
             let cmd = "claude --resume \"\(session.sessionName)\""
@@ -258,16 +263,72 @@ struct ConversationView: View {
                 }
 
                 Spacer()
-                if let duration = formattedDuration(session.duration) {
-                    Text(duration)
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+
+                // Select / Share buttons
+                if isSelectMode {
+                    Button {
+                        shareSelectedMessages(session: session)
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.system(size: 9))
+                            Text(L10n.isChinese ? "分享(\(selectedMessageIDs.count))" : "Share(\(selectedMessageIDs.count))")
+                                .font(.system(size: 10, weight: .semibold))
+                        }
+                        .foregroundColor(selectedMessageIDs.isEmpty ? Theme.textTertiary : Theme.cyan)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .fill(selectedMessageIDs.isEmpty ? Theme.cardBackground : Theme.cyan.opacity(0.12))
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(selectedMessageIDs.isEmpty)
+
+                    Button {
+                        isSelectMode = false
+                        selectedMessageIDs.removeAll()
+                    } label: {
+                        Text(L10n.isChinese ? "取消" : "Cancel")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(Theme.textTertiary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Button {
+                        isSelectMode = true
+                        selectedMessageIDs.removeAll()
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "checkmark.circle")
+                                .font(.system(size: 9))
+                            Text(L10n.isChinese ? "选择" : "Select")
+                                .font(.system(size: 10, weight: .medium))
+                        }
                         .foregroundColor(Theme.textSecondary)
                         .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
+                        .padding(.vertical, 4)
                         .background(
-                            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
                                 .fill(Theme.cardBackground)
                         )
+                    }
+                    .buttonStyle(.plain)
+
+                    if let duration = formattedDuration(session.duration) {
+                        Text(duration)
+                            .font(.system(size: 10, weight: .medium, design: .monospaced))
+                            .foregroundColor(Theme.textSecondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(
+                                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                    .fill(Theme.cardBackground)
+                            )
+                    }
                 }
             }
             .padding(.horizontal, 12)
@@ -279,13 +340,98 @@ struct ConversationView: View {
             ScrollView(.vertical, showsIndicators: true) {
                 LazyVStack(alignment: .leading, spacing: 8) {
                     ForEach(session.messages) { message in
-                        messageBubble(message)
+                        HStack(spacing: 6) {
+                            if isSelectMode {
+                                Button {
+                                    toggleMessage(message.id)
+                                } label: {
+                                    Image(systemName: selectedMessageIDs.contains(message.id)
+                                          ? "checkmark.circle.fill"
+                                          : "circle")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(selectedMessageIDs.contains(message.id)
+                                                         ? Theme.cyan
+                                                         : Theme.textTertiary.opacity(0.4))
+                                }
+                                .buttonStyle(.plain)
+                            }
+
+                            messageBubble(message)
+                        }
                     }
                 }
                 .padding(12)
             }
         }
         .background(Theme.background)
+    }
+
+    private func toggleMessage(_ id: UUID) {
+        if selectedMessageIDs.contains(id) {
+            selectedMessageIDs.remove(id)
+        } else {
+            selectedMessageIDs.insert(id)
+        }
+    }
+
+    private func shareSelectedMessages(session: Session) {
+        let selected = session.messages.filter { selectedMessageIDs.contains($0.id) }
+        guard !selected.isEmpty else { return }
+
+        var md = "# Claude Code 对话片段\n\n"
+
+        if let start = session.startTime {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd HH:mm"
+            md += "**\(formatter.string(from: start))**"
+            if let projectName = session.projectPath.map({ URL(fileURLWithPath: $0).lastPathComponent }) {
+                md += " | **\(projectName)**"
+            }
+            md += "\n\n---\n\n"
+        }
+
+        for msg in selected {
+            let isUser = msg.role == "human" || msg.role == "user"
+            let role = isUser ? "You" : "Claude"
+            let text = String(msg.content.prefix(2000))
+
+            if let ts = msg.timestamp {
+                let formatter = DateFormatter()
+                formatter.dateFormat = "HH:mm:ss"
+                md += "### \(role) `\(formatter.string(from: ts))`\n\n"
+            } else {
+                md += "### \(role)\n\n"
+            }
+            md += "\(text)\n\n"
+        }
+
+        md += "---\n*Shared via [cc-statistics](https://github.com/androidZzT/cc-statistics)*\n"
+
+        // 保存到桌面并复制到剪贴板
+        let desktop = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Desktop")
+        let fileName = "chat-share-\(selected.count)msgs.md"
+        let filePath = desktop.appendingPathComponent(fileName)
+
+        do {
+            try md.write(to: filePath, atomically: true, encoding: .utf8)
+        } catch {
+            // 写入失败也不影响复制到剪贴板
+        }
+
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(md, forType: .string)
+
+        isSelectMode = false
+        selectedMessageIDs.removeAll()
+
+        withAnimation {
+            toastMessage = L10n.isChinese ? "已复制并保存到桌面" : "Copied & saved to Desktop"
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            withAnimation {
+                toastMessage = nil
+            }
+        }
     }
 
     private func messageBubble(_ message: Message) -> some View {
