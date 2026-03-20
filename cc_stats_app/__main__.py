@@ -1,12 +1,94 @@
-"""cc-stats-app 入口：编译并启动 SwiftUI 菜单栏 App"""
+"""cc-stats-app 入口：启动 SwiftUI 菜单栏 App
+
+优先使用预编译二进制（从 GitHub Release 下载），没有则 fallback 到本地 swiftc 编译。
+"""
 
 import glob
+import json
 import os
+import platform
 import subprocess
 import sys
+import urllib.request
+import urllib.error
 
 _swift_dir = os.path.join(os.path.dirname(__file__), "swift")
 _swift_bin = os.path.join(_swift_dir, "CCStats")
+_version_file = os.path.join(_swift_dir, ".binary_version")
+
+GITHUB_REPO = "androidZzT/cc-statistics"
+
+
+def _get_current_version() -> str:
+    """从 pyproject.toml 或 SettingsView 读取当前版本"""
+    settings = os.path.join(_swift_dir, "Views", "SettingsView.swift")
+    if os.path.exists(settings):
+        with open(settings) as f:
+            for line in f:
+                if "appVersion" in line and "=" in line:
+                    return line.split('"')[1]
+    return "unknown"
+
+
+def _get_binary_version() -> str:
+    """读取已下载二进制的版本"""
+    if os.path.exists(_version_file):
+        with open(_version_file) as f:
+            return f.read().strip()
+    return ""
+
+
+def _save_binary_version(version: str):
+    with open(_version_file, "w") as f:
+        f.write(version)
+
+
+def _try_download_binary() -> bool:
+    """尝试从 GitHub Release 下载预编译二进制"""
+    current_version = _get_current_version()
+    binary_version = _get_binary_version()
+
+    # 已有匹配版本的二进制且文件存在
+    if (
+        binary_version == current_version
+        and os.path.exists(_swift_bin)
+        and os.access(_swift_bin, os.X_OK)
+    ):
+        return True
+
+    arch = platform.machine()  # arm64 or x86_64
+    if arch not in ("arm64", "x86_64"):
+        return False
+
+    asset_name = f"CCStats-{arch}"
+    tag = f"v{current_version}"
+
+    try:
+        # 查询 release assets
+        url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/tags/{tag}"
+        req = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            release = json.loads(resp.read().decode())
+
+        # 找到对应架构的 asset
+        asset_url = None
+        for asset in release.get("assets", []):
+            if asset["name"] == asset_name:
+                asset_url = asset["browser_download_url"]
+                break
+
+        if not asset_url:
+            return False
+
+        print(f"Downloading prebuilt binary ({arch})...")
+        urllib.request.urlretrieve(asset_url, _swift_bin)
+        os.chmod(_swift_bin, 0o755)
+        _save_binary_version(current_version)
+        print("Done.")
+        return True
+
+    except (urllib.error.URLError, json.JSONDecodeError, OSError, KeyError):
+        return False
 
 
 def _need_recompile() -> bool:
@@ -51,7 +133,10 @@ def _compile_swift():
 
 
 def main():
-    _compile_swift()
+    # 优先下载预编译二进制
+    if not _try_download_binary():
+        # fallback: 本地编译
+        _compile_swift()
 
     # 自动后台运行：fork 进程后父进程退出，不占用终端
     if os.fork() != 0:

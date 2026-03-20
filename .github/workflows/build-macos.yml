@@ -1,0 +1,43 @@
+name: Build macOS Binary
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        arch: [arm64, x86_64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Collect Swift files
+        id: swift-files
+        run: |
+          FILES=$(find cc_stats_app/swift -name "*.swift" | sort | tr '\n' ' ')
+          echo "files=$FILES" >> $GITHUB_OUTPUT
+
+      - name: Build for ${{ matrix.arch }}
+        run: |
+          swiftc \
+            ${{ steps.swift-files.outputs.files }} \
+            -o CCStats-${{ matrix.arch }} \
+            -framework Cocoa \
+            -framework SwiftUI \
+            -framework Carbon \
+            -lsqlite3 \
+            -O \
+            -target ${{ matrix.arch }}-apple-macosx13.0
+
+      - name: Upload to Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload ${{ github.event.release.tag_name }} \
+            CCStats-${{ matrix.arch }} \
+            --clobber
