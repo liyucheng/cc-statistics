@@ -149,34 +149,34 @@ enum L10n {
 
     // MARK: - Metric Explanations
     static var helpSessions: String {
-        isChinese ? "独立会话数（claude 启动或 --resume）" : "Distinct sessions (claude start or --resume)"
+        isChinese ? "打开 Claude Code 的次数" : "Times Claude Code was opened"
     }
     static var helpInstructions: String {
-        isChinese ? "用户真实指令数，排除工具返回" : "User messages, excluding tool results"
+        isChinese ? "你发送的消息数" : "Messages you sent"
     }
     static var helpDuration: String {
-        isChinese ? "AI处理 + 用户操作，间隔>5分钟不计入" : "AI + user time, gaps >5min excluded"
+        isChinese ? "你和 AI 都在工作的时间" : "Time you and AI were active"
     }
     static var helpCost: String {
-        isChinese ? "按模型官方定价估算，仅供参考" : "Estimated from model pricing"
+        isChinese ? "按官方定价估算，仅供参考" : "Estimated cost, for reference"
     }
     static var helpToolCalls: String {
-        isChinese ? "AI 工具调用次数，按类型排名" : "AI tool calls, ranked by type"
+        isChinese ? "AI 使用各类工具的次数" : "How often AI used each tool"
     }
     static var helpDevTime: String {
-        isChinese ? "AI处理 = 用户发消息→AI回复\n用户活跃 = AI回复→下次发消息(≤5min)" : "AI = msg→response time\nUser = response→next msg (≤5min)"
+        isChinese ? "AI 处理和你思考的时间拆分" : "AI processing vs your thinking time"
     }
     static var helpCodeChanges: String {
-        isChinese ? "Git: 已提交变更\nAI工具: Edit/Write 调用" : "Git: committed changes\nAI Tools: Edit/Write calls"
+        isChinese ? "AI 帮你写了多少代码" : "How much code AI wrote for you"
     }
     static var helpTokenUsage: String {
-        isChinese ? "输入/输出/缓存 token 分类统计" : "Input/output/cache token breakdown"
+        isChinese ? "消耗的 token 明细" : "Token consumption details"
     }
     static var helpEfficiency: String {
-        isChinese ? "代码产出40 + 指令精准30 + AI利用率30" : "Code output 40 + Precision 30 + AI util 30"
+        isChinese ? "每消耗 1K token 产出多少代码" : "Code output per 1K tokens spent"
     }
     static var helpCostPrediction: String {
-        isChinese ? "日均 × 30 = 月度预测" : "Daily avg × 30 = monthly projection"
+        isChinese ? "按当前用量预测月度花费" : "Projected monthly cost at current rate"
     }
 
     // MARK: - Process Manager
