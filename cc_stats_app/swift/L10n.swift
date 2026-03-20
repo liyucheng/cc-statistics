@@ -149,54 +149,34 @@ enum L10n {
 
     // MARK: - Metric Explanations
     static var helpSessions: String {
-        isChinese
-            ? "统计选定时间范围内的独立会话数量。一次 claude 命令启动或 --resume 恢复算一个会话。"
-            : "Number of distinct sessions in the selected time range. Each claude command or --resume counts as one session."
+        isChinese ? "独立会话数（claude 启动或 --resume）" : "Distinct sessions (claude start or --resume)"
     }
     static var helpInstructions: String {
-        isChinese
-            ? "用户发出的真实指令数（排除工具返回和系统消息）。反映你和 AI 的交互密度。"
-            : "Real user messages sent (excludes tool results and system messages). Reflects your interaction density with AI."
+        isChinese ? "用户真实指令数，排除工具返回" : "User messages, excluding tool results"
     }
     static var helpDuration: String {
-        isChinese
-            ? "活跃时长 = AI 处理时间 + 用户操作时间。用户超过 5 分钟无操作的间隔不计入。不是首尾时间差，所以不会因 resume 跨天而虚高。"
-            : "Active time = AI processing + user active time. Gaps > 5 min are excluded. Not wall-clock time, so resume across days won't inflate it."
+        isChinese ? "AI处理 + 用户操作，间隔>5分钟不计入" : "AI + user time, gaps >5min excluded"
     }
     static var helpCost: String {
-        isChinese
-            ? "根据各模型官方定价计算：input/output/cache token 分别按价计费。仅为估算，实际以账单为准。"
-            : "Estimated from official model pricing: input/output/cache tokens billed separately. For reference only — check your actual bill."
+        isChinese ? "按模型官方定价估算，仅供参考" : "Estimated from model pricing"
     }
     static var helpToolCalls: String {
-        isChinese
-            ? "AI 调用的工具次数，按工具类型分组排名。Skill 和 MCP 工具会展开为具体名称。"
-            : "Tool invocations by AI, grouped and ranked by type. Skill and MCP tools are expanded to specific names."
+        isChinese ? "AI 工具调用次数，按类型排名" : "AI tool calls, ranked by type"
     }
     static var helpDevTime: String {
-        isChinese
-            ? "AI 处理：每轮从用户发消息到 AI 最后一条响应的时间之和。\n用户活跃：上一轮 AI 结束到下一轮用户消息的间隔（≤5分钟才计入）。\nAI 占比 = AI 处理 / (AI 处理 + 用户活跃)。"
-            : "AI Processing: sum of time from user message to AI's last response per turn.\nUser Active: gap between AI's last response and next user message (only if ≤5min).\nAI Ratio = AI / (AI + User)."
+        isChinese ? "AI处理 = 用户发消息→AI回复\n用户活跃 = AI回复→下次发消息(≤5min)" : "AI = msg→response time\nUser = response→next msg (≤5min)"
     }
     static var helpCodeChanges: String {
-        isChinese
-            ? "Git 已提交：会话期间 git commit 的实际变更，按语言分类。AI commit 通过 Co-Authored-By 标记识别。\nAI 工具变更：来自 Edit/Write 工具调用的代码行数（可能未提交）。"
-            : "Git Committed: actual changes from git commits during session, by language. AI commits detected via Co-Authored-By markers.\nAI Tool Changes: lines from Edit/Write tool calls (may not be committed)."
+        isChinese ? "Git: 已提交变更\nAI工具: Edit/Write 调用" : "Git: committed changes\nAI Tools: Edit/Write calls"
     }
     static var helpTokenUsage: String {
-        isChinese
-            ? "输入：发送给模型的 token 数。输出：模型生成的 token 数。\n缓存读：命中 prompt cache 的 token（按 0.1x 计费）。\n缓存写：新建 cache 的 token（按 1.25x 计费）。"
-            : "Input: tokens sent to model. Output: tokens generated.\nCache Read: prompt cache hits (billed at 0.1x).\nCache Write: new cache entries (billed at 1.25x)."
+        isChinese ? "输入/输出/缓存 token 分类统计" : "Input/output/cache token breakdown"
     }
     static var helpEfficiency: String {
-        isChinese
-            ? "代码产出(40分): 行/K Token\n指令精准(30分): Token/条\nAI利用率(30分): AI时间占比\nS≥90 A≥75 B≥60 C≥40 D<40"
-            : "Code(40): lines/K Token\nPrecision(30): Token/msg\nAI Util(30): AI time ratio\nS≥90 A≥75 B≥60 C≥40 D<40"
+        isChinese ? "代码产出40 + 指令精准30 + AI利用率30" : "Code output 40 + Precision 30 + AI util 30"
     }
     static var helpCostPrediction: String {
-        isChinese
-            ? "日均费用 = 总费用 / 有数据的天数。\n月度预测 = 日均 × 30。\n超过 $1000 显示红色警告。"
-            : "Daily Avg = total cost / days with data.\nMonthly = daily avg × 30.\nShown in red if > $1000."
+        isChinese ? "日均 × 30 = 月度预测" : "Daily avg × 30 = monthly projection"
     }
 
     // MARK: - Process Manager
