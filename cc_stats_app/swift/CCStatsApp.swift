@@ -583,6 +583,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Conversation Panel
 
     private func observeConversationPanel() {
+        // 设置拉到前面的回调
+        viewModel.bringConversationToFront = { [weak self] in
+            self?.panelManager.bringToFront()
+        }
+
         viewModel.$showConversationPanel
             .receive(on: DispatchQueue.main)
             .sink { [weak self] show in

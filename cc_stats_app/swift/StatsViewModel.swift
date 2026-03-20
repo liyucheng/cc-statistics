@@ -343,14 +343,13 @@ final class StatsViewModel: ObservableObject {
         refresh()
     }
 
+    /// 外部可调用的拉到前面回调，由 AppDelegate 设置
+    var bringConversationToFront: (() -> Void)?
+
     func toggleConversationPanel() {
         if showConversationPanel {
-            // 面板已打开，重新触发 sink 拉到前面
-            // 先设 false 再设 true 触发变化
-            showConversationPanel = false
-            DispatchQueue.main.async {
-                self.showConversationPanel = true
-            }
+            // 面板已打开，直接拉到前面
+            bringConversationToFront?()
         } else {
             showConversationPanel = true
         }
