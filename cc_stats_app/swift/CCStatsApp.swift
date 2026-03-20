@@ -20,6 +20,8 @@ final class PanelManager: ObservableObject {
 
         let rect = NSRect(x: 0, y: 0, width: 420, height: 600)
         let newPanel = FloatingPanel(contentRect: rect)
+        // 对话窗口用普通级别，点击其他窗口时可以到后面
+        newPanel.level = .normal
 
         if let container = newPanel.contentView {
             container.addSubview(hostingView)
