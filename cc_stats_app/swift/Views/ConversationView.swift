@@ -386,8 +386,8 @@ struct ConversationView: View {
             startTime: session.startTime
         )
 
-        // 渲染为高清图片 (2x)
-        let scale: CGFloat = 2.0
+        // 渲染为高清图片 (3x)
+        let scale: CGFloat = 3.0
         let cardWidth: CGFloat = 520
         let hostingView = NSHostingView(rootView: cardView.frame(width: cardWidth))
         hostingView.frame = NSRect(x: 0, y: 0, width: cardWidth, height: 10000)
