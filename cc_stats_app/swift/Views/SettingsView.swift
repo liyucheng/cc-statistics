@@ -12,6 +12,7 @@ struct SettingsView: View {
     @State private var theme: String = "auto"
     @State private var dailyCostLimit: String = ""
     @State private var weeklyCostLimit: String = ""
+    @State private var apiToken: String = ""
     @State private var latestVersion: String?
     @State private var checkingUpdate: Bool = false
 
@@ -100,6 +101,69 @@ struct SettingsView: View {
                             text: $weeklyCostLimit,
                             key: "cc_stats_weekly_cost_limit"
                         )
+                    }
+
+                    // Rate Limit section
+                    settingsSection(title: L10n.rateLimit, icon: "gauge.with.dots.needle.50percent") {
+                        HStack {
+                            Image(systemName: "key")
+                                .font(.system(size: 12))
+                                .foregroundColor(Theme.cyan)
+                                .frame(width: 24)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(L10n.apiToken)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(Theme.textPrimary)
+                                Text(L10n.apiTokenDesc)
+                                    .font(.system(size: 10))
+                                    .foregroundColor(Theme.textTertiary)
+                            }
+                            Spacer()
+                            Button {
+                                autoFetchToken()
+                            } label: {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "arrow.down.circle")
+                                        .font(.system(size: 9))
+                                    Text(L10n.isChinese ? "自动获取" : "Auto Fetch")
+                                        .font(.system(size: 9, weight: .semibold))
+                                }
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                        .fill(Theme.cyan)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        HStack(spacing: 6) {
+                            SecureField(L10n.apiTokenPlaceholder, text: $apiToken)
+                                .textFieldStyle(.plain)
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundColor(Theme.textPrimary)
+                            if !apiToken.isEmpty {
+                                Button {
+                                    apiToken = ""
+                                    UserDefaults.standard.set("", forKey: UsageAPI.tokenKey)
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(Theme.textTertiary)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                .fill(Theme.cardBackground)
+                        )
+                        .onChange(of: apiToken) { newValue in
+                            UserDefaults.standard.set(newValue, forKey: UsageAPI.tokenKey)
+                        }
                     }
 
                     // About section
@@ -276,7 +340,7 @@ struct SettingsView: View {
 
     // MARK: - Version
 
-    static let appVersion = "0.10.0"
+    static let appVersion = "0.10.1"
     private var currentVersion: String { Self.appVersion }
 
     private func checkForUpdate() {
@@ -312,6 +376,7 @@ struct SettingsView: View {
         dailyCostLimit = daily > 0 ? String(format: "%.0f", daily) : ""
         let weekly = UserDefaults.standard.double(forKey: "cc_stats_weekly_cost_limit")
         weeklyCostLimit = weekly > 0 ? String(format: "%.0f", weekly) : ""
+        apiToken = UserDefaults.standard.string(forKey: UsageAPI.tokenKey) ?? ""
     }
 
     private func toggleLaunchAtLogin(_ enable: Bool) {
@@ -334,5 +399,39 @@ struct SettingsView: View {
     private func saveThemeSetting(_ theme: String) {
         UserDefaults.standard.set(theme, forKey: "cc_stats_theme")
         onThemeChanged?(theme)
+    }
+
+    private func autoFetchToken() {
+        let username = NSUserName()
+        let process = Process()
+        let pipe = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
+        process.arguments = [
+            "find-generic-password",
+            "-s", "Claude Code-credentials",
+            "-a", username,
+            "-w",
+        ]
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            guard process.terminationStatus == 0,
+                  let jsonString = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  let jsonData = jsonString.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+                  let oauth = json["claudeAiOauth"] as? [String: Any],
+                  let token = oauth["accessToken"] as? String,
+                  !token.isEmpty else {
+                return
+            }
+            apiToken = token
+            UserDefaults.standard.set(token, forKey: UsageAPI.tokenKey)
+        } catch {
+            // Keychain access failed — user may have denied the prompt
+        }
     }
 }

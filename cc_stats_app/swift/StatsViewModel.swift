@@ -62,6 +62,7 @@ final class StatsViewModel: ObservableObject {
     @Published var alertMessages: [String] = []
     @Published var isOverDailyLimit: Bool = false
     @Published var isOverWeeklyLimit: Bool = false
+    @Published var rateLimitData: UsageAPI.UsageData?
 
     enum StatsTab: String, CaseIterable {
         case claudeCode = "Claude Code"
@@ -291,6 +292,9 @@ final class StatsViewModel: ObservableObject {
 
         self.lastRefreshed = Date()
 
+        // 获取速率限制（如果配置了 token）
+        fetchRateLimit()
+
         // 检查用量预警
         checkAlerts(dailyCost: result.todayCost, weeklyCost: result.weeklyCost)
     }
@@ -358,6 +362,14 @@ final class StatsViewModel: ObservableObject {
 
     func toggleConversationPanel() {
         showConversationPanel.toggle()
+    }
+
+    private func fetchRateLimit() {
+        UsageAPI.fetch { [weak self] data in
+            DispatchQueue.main.async {
+                self?.rateLimitData = data
+            }
+        }
     }
 
     // MARK: - Private Methods

@@ -412,7 +412,8 @@ struct ConversationView: View {
             bitsPerPixel: 0
         ) else { return }
 
-        bitmapRep.size = NSSize(width: cardWidth, height: fittingSize.height)
+        // 不设置 bitmapRep.size — 保持默认值(=像素尺寸)，隐含 1x DPI
+        // scaleBy(3) 将 520pt hostingView.bounds 映射到 1560px，刚好填满 bitmap
 
         NSGraphicsContext.saveGraphicsState()
         guard let ctx = NSGraphicsContext(bitmapImageRep: bitmapRep) else {

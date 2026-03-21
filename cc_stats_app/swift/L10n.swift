@@ -129,6 +129,17 @@ enum L10n {
     static var alertDaily: String { isChinese ? "单日" : "Daily" }
     static var alertWeekly: String { isChinese ? "每周" : "Weekly" }
 
+    // MARK: - Rate Limit
+    static var rateLimit: String { isChinese ? "速率限制" : "Rate Limit" }
+    static var apiToken: String { "API Token" }
+    static var apiTokenDesc: String { isChinese ? "填入后显示 Claude 速率用量（仅用于查询，不会上传）" : "Enter to show Claude rate limit usage (query only, never uploaded)" }
+    static var apiTokenPlaceholder: String { isChinese ? "粘贴 OAuth Token..." : "Paste OAuth token..." }
+    static var fiveHourUsage: String { isChinese ? "5小时" : "5-Hour" }
+    static var sevenDayUsage: String { isChinese ? "7天" : "7-Day" }
+    static var resetsAt: String { isChinese ? "重置于" : "Resets" }
+    static var rateLimitUnavailable: String { isChinese ? "未配置 Token" : "Token not configured" }
+    static var helpRateLimit: String { isChinese ? "Claude Pro/Max 订阅的速率配额用量" : "Claude Pro/Max subscription rate quota usage" }
+
     // MARK: - Update
     static var newVersion: String { isChinese ? "发现新版本" : "New version" }
     static var updateNow: String { isChinese ? "立即更新" : "Update" }

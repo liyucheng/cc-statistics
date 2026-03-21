@@ -9,6 +9,8 @@ struct DashboardView: View {
     @State private var toastMessage: String?
     @State private var processes: [ProcessInfo2] = []
     @State private var trendMetric: TrendMetric = .cost
+    @State private var activeGuide: String?
+    @State private var guideAnchors: [String: Anchor<CGRect>] = [:]
 
     enum TrendMetric: String, CaseIterable {
         case cost, tokens, sessions, activeTime
@@ -119,6 +121,22 @@ struct DashboardView: View {
                 .animation(.easeInOut(duration: 0.25), value: toastMessage != nil)
             }
 
+            // Guide overlay
+            if let guideId = activeGuide {
+                GuideOverlay(
+                    stepId: guideId,
+                    title: guideTitle(for: guideId),
+                    message: guideMessage(for: guideId),
+                    arrowEdge: .top,
+                    anchors: guideAnchors,
+                    onDismiss: {
+                        GuideManager.markShown("rate_limit_setup")
+                        activeGuide = nil
+                    }
+                )
+                .zIndex(100)
+            }
+
             // Loading overlay
             if viewModel.isLoading && viewModel.stats != nil {
                 Color.black.opacity(0.3)
@@ -144,6 +162,9 @@ struct DashboardView: View {
         .background(Theme.background)
         .preferredColorScheme(resolvedColorScheme)
         .animation(.easeInOut(duration: 0.15), value: viewModel.isLoading)
+        .onPreferenceChange(GuideAnchorKey.self) { guideAnchors = $0 }
+        .onAppear { triggerGuideIfNeeded() }
+        .onChange(of: viewModel.stats != nil) { _ in triggerGuideIfNeeded() }
     }
 
     private var resolvedColorScheme: ColorScheme? {
@@ -151,6 +172,41 @@ struct DashboardView: View {
         case "dark": return .dark
         case "light": return .light
         default: return nil  // follow system
+        }
+    }
+
+    // MARK: - Guide
+
+    private func triggerGuideIfNeeded() {
+        // Only show guides when dashboard is visible and data is loaded
+        guard viewModel.stats != nil, !viewModel.showSettings else { return }
+
+        // Rate limit guide: show once if token not configured
+        let tokenConfigured = !(UserDefaults.standard.string(forKey: UsageAPI.tokenKey) ?? "").isEmpty
+        if !tokenConfigured && !GuideManager.hasShown("rate_limit_setup") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                activeGuide = "settings_gear"
+            }
+        }
+    }
+
+    private func guideTitle(for id: String) -> String {
+        switch id {
+        case "settings_gear":
+            return L10n.isChinese ? "查看 Claude 速率配额" : "View Claude Rate Limit"
+        default:
+            return ""
+        }
+    }
+
+    private func guideMessage(for id: String) -> String {
+        switch id {
+        case "settings_gear":
+            return L10n.isChinese
+                ? "在设置中粘贴 OAuth Token，即可实时显示 5 小时 / 7 天用量百分比。Token 仅用于本地查询，不会上传。"
+                : "Paste your OAuth token in Settings to see real-time 5-hour / 7-day usage. Token is only used locally."
+        default:
+            return ""
         }
     }
 
@@ -202,6 +258,7 @@ struct DashboardView: View {
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 14) {
                         headerCards(stats: stats)
+                        rateLimitSection
                         trendChart
                         developmentTimeSection(stats: stats)
                         codeChangesSection(stats: stats)
@@ -353,6 +410,7 @@ struct DashboardView: View {
                         .frame(width: 24, height: 24)
                 }
                 .buttonStyle(.plain)
+                .guideAnchor("settings_gear")
             }
             .padding(.horizontal, 16)
             .padding(.top, 10)
@@ -933,6 +991,66 @@ struct DashboardView: View {
     }
 
     // MARK: - Cost Prediction
+
+    @ViewBuilder
+    private var rateLimitSection: some View {
+        if let data = viewModel.rateLimitData {
+            GlassCard {
+                VStack(alignment: .leading, spacing: 8) {
+                    SectionHeader(icon: "gauge.with.dots.needle.50percent", title: L10n.rateLimit, accentColor: Theme.cyan, helpText: L10n.helpRateLimit)
+
+                    HStack(spacing: 12) {
+                        rateLimitGauge(
+                            label: L10n.fiveHourUsage,
+                            percent: data.fiveHourPercent,
+                            resetTime: UsageAPI.formatResetTime(data.fiveHourResetsAt)
+                        )
+                        rateLimitGauge(
+                            label: L10n.sevenDayUsage,
+                            percent: data.sevenDayPercent,
+                            resetTime: UsageAPI.formatResetTime(data.sevenDayResetsAt)
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func rateLimitGauge(label: String, percent: Int, resetTime: String) -> some View {
+        VStack(spacing: 6) {
+            Text(label)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundColor(Theme.textTertiary)
+
+            ZStack {
+                // Background track
+                Circle()
+                    .stroke(Theme.border, lineWidth: 4)
+                    .frame(width: 52, height: 52)
+
+                // Progress arc
+                Circle()
+                    .trim(from: 0, to: CGFloat(percent) / 100)
+                    .stroke(
+                        percent >= 80 ? Theme.red : percent >= 50 ? Theme.amber : Theme.green,
+                        style: StrokeStyle(lineWidth: 4, lineCap: .round)
+                    )
+                    .frame(width: 52, height: 52)
+                    .rotationEffect(.degrees(-90))
+
+                Text("\(percent)%")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundColor(percent >= 80 ? Theme.red : Theme.textPrimary)
+            }
+
+            if !resetTime.isEmpty {
+                Text(L10n.resetsAt + " " + resetTime)
+                    .font(.system(size: 8))
+                    .foregroundColor(Theme.textTertiary)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
 
     private func costPredictionSection(stats: SessionStats) -> some View {
         let activeDays = viewModel.dailyStats.filter { $0.cost > 0 }.count
