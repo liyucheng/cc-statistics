@@ -227,7 +227,7 @@ final class StatsViewModel: ObservableObject {
             let todaySessions = allSessions.filter { session in
                 session.messages.contains { $0.timestamp.map { $0 >= todayStart } ?? false }
             }
-            let todayStats = SessionAnalyzer.analyze(sessions: todaySessions)
+            let todayStats = SessionAnalyzer.analyze(sessions: todaySessions, since: todayStart)
 
             // 每日聚合（最近 14 天）
             let calendar = Calendar.current

@@ -8,3 +8,4 @@ build/
 cc_stats_app/swift/CCStats
 cc_stats_app/swift/.binary_version
 .DS_Store
+marketing/
