@@ -82,7 +82,7 @@ pipx install cc-statistics
 pip install cc-statistics
 
 # Homebrew（macOS / Linux）
-brew install androidZzT/tap/cc-statistics  # TODO: 待上架
+brew install androidZzT/tap/cc-statistics
 ```
 
 零依赖，纯 Python 标准库。
