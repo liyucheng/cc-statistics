@@ -22,11 +22,46 @@ AI Coding 会话统计工具 — 支持 Claude Code / Gemini CLI / Codex / Curso
 - **多维统计** — 指令数、工具调用 Top 10、开发时长（AI vs 用户）、代码变更（按语言）、Token（按模型）
 - **每日趋势** — 14 天费用趋势图，直观掌握 AI 使用规律
 - **用量预警** — 设置单日/每周费用上限，超限时状态栏变红 + 系统通知
-- **会话搜索 & 恢复** — 搜索历史会话内容，一键复制 `claude --resume` 恢复对话
 - **周报/月报** — 自动生成 Markdown 统计报告，支持飞书/钉钉/Slack 推送
 - **纯本地** — 所有数据读取自本地文件，不联网，不上传
 - **三种模式** — CLI 命令行 + Web Dashboard（跨平台）+ macOS 原生状态栏面板
 - **双语** — 自动跟随系统语言，支持中文 / English 手动切换
+
+## 会话管理：搜索、恢复、分享
+
+> Claude Code 原生只提供 `claude --resume`（交互式选择器）和 `claude --continue`（续最近一个），**没有内容搜索、没有导出、没有分享**。cc-stats 补齐了这些能力。
+
+### 搜索
+
+按关键词搜索所有历史会话内容，快速定位到目标对话：
+
+```bash
+# CLI：按关键词搜索并导出
+cc-stats --export-chat "登录bug"
+```
+
+macOS 面板内置搜索框，实时过滤会话列表，输入关键词即可匹配对话内容。
+
+### 恢复
+
+找到目标会话后，一键复制 `claude --resume <session-id>` 命令恢复对话：
+
+- **macOS 面板** — 点击会话卡片的「恢复」按钮，命令自动复制到剪贴板，粘贴到终端即可继续
+- **CLI** — `--export-chat` 导出的 Markdown 文件头部包含 session ID，配合 `claude --resume` 使用
+
+### 导出 & 分享
+
+将对话导出为可读格式，方便存档或分享给团队：
+
+```bash
+# 导出为 Markdown（自动保存到桌面）
+cc-stats --export-chat "重构方案"
+
+# 包含工具调用详情
+cc-stats --export-chat "重构方案" --include-tools
+```
+
+macOS 面板支持选中多条消息，一键生成**分享长图**（PNG），直接发到微信/飞书/Slack。
 
 ## 请 cc 吃 Token
 
