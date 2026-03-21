@@ -12,9 +12,12 @@ _MAX_DIFF_CHARS = 80000  # 超长 diff 截断
 
 
 def _call_claude(prompt: str) -> str:
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        print("ANTHROPIC_API_KEY not set", file=sys.stderr)
+    # 优先 OAuth token（Claude Code 订阅），其次 API key
+    oauth_token = os.environ.get("CLAUDE_OAUTH_TOKEN", "")
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+
+    if not oauth_token and not api_key:
+        print("需要设置 CLAUDE_OAUTH_TOKEN 或 ANTHROPIC_API_KEY", file=sys.stderr)
         sys.exit(1)
 
     body = json.dumps({
@@ -23,15 +26,16 @@ def _call_claude(prompt: str) -> str:
         "messages": [{"role": "user", "content": prompt}],
     }).encode("utf-8")
 
-    req = urllib.request.Request(
-        _API_URL,
-        data=body,
-        headers={
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-        },
-    )
+    headers = {
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    }
+    if oauth_token:
+        headers["Authorization"] = f"Bearer {oauth_token}"
+    else:
+        headers["x-api-key"] = api_key
+
+    req = urllib.request.Request(_API_URL, data=body, headers=headers)
 
     try:
         with urllib.request.urlopen(req, timeout=120) as resp:

@@ -31,7 +31,7 @@ jobs:
       - name: AI Review
         if: steps.diff.outputs.diff_size != '0'
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_OAUTH_TOKEN: ${{ secrets.CLAUDE_OAUTH_TOKEN }}
         run: |
           python .github/scripts/pr_review.py \
             --diff /tmp/pr.diff \
