@@ -361,6 +361,7 @@ def analyze_session(session: Session) -> SessionStats:
 
                 # -------- 4. 代码行数（从 Edit/Write 工具提取） --------
                 if tc.name == "Write":
+                    # Claude: file_path/content; Gemini: file_path/content
                     fp = tc.input.get("file_path", "")
                     content = tc.input.get("content", "")
                     lang = _detect_lang(fp)
@@ -371,9 +372,18 @@ def analyze_session(session: Session) -> SessionStats:
                     stats.code_changes.append(change)
 
                 elif tc.name == "Edit":
-                    fp = tc.input.get("file_path", "")
+                    # Claude: file_path/old_string/new_string
+                    # Gemini: target_file/code_edit (无 old/new 拆分)
+                    fp = (
+                        tc.input.get("file_path", "")
+                        or tc.input.get("target_file", "")
+                    )
                     old = tc.input.get("old_string", "")
                     new = tc.input.get("new_string", "")
+                    if not old and not new:
+                        # Gemini edit_file：只有 code_edit，按新增估算
+                        code_edit = tc.input.get("code_edit", "")
+                        new = code_edit
                     lang = _detect_lang(fp)
                     old_lines = _count_lines(old)
                     new_lines = _count_lines(new)

@@ -83,6 +83,7 @@ select:hover{border-color:var(--cyan)}
         <option value="">All Sources</option>
         <option value="claude">Claude Code</option>
         <option value="codex">Codex</option>
+        <option value="gemini">Gemini CLI</option>
       </select>
       <div class="time-btns">
         <button class="time-btn active" data-days="1">Today</button>
@@ -108,7 +109,7 @@ select:hover{border-color:var(--cyan)}
   <div class="info" id="info"></div>
 </div>
 <script>
-let currentProject='',currentDays=1;
+let currentProject='',currentDays=1,currentSource='',allProjects=[];
 const COLORS=['#58a6ff','#bc8cff','#3fb950','#f0883e','#f85149','#f778ba','#39d2c0','#d29922'];
 function fmt(n){if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'K';return n.toLocaleString()}
 function fmtCost(n){return n>=100?'$'+n.toFixed(0):n>=1?'$'+n.toFixed(2):n>=.01?'$'+n.toFixed(3):'$'+n.toFixed(4)}
@@ -120,12 +121,18 @@ async function api(path,params){
 }
 
 async function loadProjects(){
+  allProjects=await api('/api/projects');
+  renderProjectSelect();
+}
+function renderProjectSelect(){
   const sel=document.getElementById('project-select');
-  const projects=await api('/api/projects');
+  const filtered=currentSource?allProjects.filter(p=>(p.source||'claude')===currentSource):allProjects;
   sel.innerHTML='<option value="">All Projects</option>';
-  projects.forEach(p=>{
+  filtered.forEach(p=>{
     const o=document.createElement('option');o.value=p.dir_name;
-    const parts=p.display_name.split('/');o.textContent=parts.slice(-1)[0]+' ('+p.session_count+')';
+    const parts=p.display_name.split('/');
+    const tag=p.source==='gemini'?' [G]':'';
+    o.textContent=parts.slice(-1)[0]+tag+' ('+p.session_count+')';
     sel.appendChild(o);
   });
 }
@@ -213,6 +220,9 @@ function updateTools(d){
 }
 
 document.getElementById('project-select').addEventListener('change',e=>{currentProject=e.target.value;loadStats()});
+document.getElementById('source-select').addEventListener('change',e=>{
+  currentSource=e.target.value;currentProject='';renderProjectSelect();loadStats();
+});
 document.querySelectorAll('.time-btn').forEach(b=>b.addEventListener('click',()=>{
   document.querySelectorAll('.time-btn').forEach(x=>x.classList.remove('active'));
   b.classList.add('active');currentDays=parseInt(b.dataset.days);loadStats();

@@ -6,6 +6,7 @@ enum DataSource: String, CaseIterable, Identifiable {
     case all
     case claudeCode
     case codex
+    case gemini
     case cursor
 
     var id: String { rawValue }
@@ -15,6 +16,7 @@ enum DataSource: String, CaseIterable, Identifiable {
         case .all: return L10n.allSources
         case .claudeCode: return "Claude Code"
         case .codex: return "Codex"
+        case .gemini: return "Gemini CLI"
         case .cursor: return "Cursor"
         }
     }
@@ -24,6 +26,7 @@ enum DataSource: String, CaseIterable, Identifiable {
         case .all: return "square.stack.3d.up"
         case .claudeCode: return "sparkles"
         case .codex: return "chevron.left.forwardslash.chevron.right"
+        case .gemini: return "diamond"
         case .cursor: return "cursorarrow.rays"
         }
     }
@@ -169,6 +172,7 @@ struct Session: Identifiable {
         if lower.contains("opus") { return 200_000 }
         if lower.contains("sonnet") { return 200_000 }
         if lower.contains("haiku") { return 200_000 }
+        if lower.contains("gemini") { return 1_000_000 }
         if lower.contains("gpt-4o") { return 128_000 }
         if lower.contains("o1") || lower.contains("o3") { return 200_000 }
         return 200_000  // default
@@ -401,7 +405,6 @@ struct ModelPricing {
 }
 
 enum CostEstimator {
-    // Claude API pricing (as of 2025)
     private static let pricing: [String: ModelPricing] = [
         // Claude
         "opus": ModelPricing(inputPerMillion: 15, outputPerMillion: 75, cacheReadPerMillion: 1.5, cacheCreatePerMillion: 18.75),
@@ -414,6 +417,10 @@ enum CostEstimator {
         "o3": ModelPricing(inputPerMillion: 10, outputPerMillion: 40, cacheReadPerMillion: 2.5, cacheCreatePerMillion: 10),
         "o3-mini": ModelPricing(inputPerMillion: 1.1, outputPerMillion: 4.4, cacheReadPerMillion: 0.55, cacheCreatePerMillion: 1.1),
         "o4-mini": ModelPricing(inputPerMillion: 1.1, outputPerMillion: 4.4, cacheReadPerMillion: 0.55, cacheCreatePerMillion: 1.1),
+        // Gemini
+        "gemini-2.5-pro": ModelPricing(inputPerMillion: 1.25, outputPerMillion: 10, cacheReadPerMillion: 0.31, cacheCreatePerMillion: 1.25),
+        "gemini-2.5-flash": ModelPricing(inputPerMillion: 0.15, outputPerMillion: 0.60, cacheReadPerMillion: 0.04, cacheCreatePerMillion: 0.15),
+        "gemini-2.0-flash": ModelPricing(inputPerMillion: 0.10, outputPerMillion: 0.40, cacheReadPerMillion: 0.025, cacheCreatePerMillion: 0.10),
     ]
 
     static func estimateCost(tokenUsage: [String: TokenDetail]) -> Double {
@@ -440,6 +447,11 @@ enum CostEstimator {
 
     private static func matchPricing(_ model: String) -> ModelPricing {
         let lower = model.lowercased()
+        // Gemini models (check first — more specific names)
+        if lower.contains("gemini-2.5-pro") { return pricing["gemini-2.5-pro"]! }
+        if lower.contains("gemini-2.5-flash") { return pricing["gemini-2.5-flash"]! }
+        if lower.contains("gemini-2.0-flash") { return pricing["gemini-2.0-flash"]! }
+        if lower.contains("gemini") { return pricing["gemini-2.5-flash"]! }
         // Claude models
         if lower.contains("opus") { return pricing["opus"]! }
         if lower.contains("haiku") { return pricing["haiku"]! }

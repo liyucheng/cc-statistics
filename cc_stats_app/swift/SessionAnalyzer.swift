@@ -292,10 +292,17 @@ class SessionAnalyzer {
                         additions: added, deletions: 0
                     ))
                 } else if call.name == "Edit" {
-                    let filePath = call.input["file_path"] as? String ?? ""
+                    // Claude: file_path/old_string/new_string
+                    // Gemini: target_file/code_edit
+                    let filePath = (call.input["file_path"] as? String)
+                        ?? (call.input["target_file"] as? String) ?? ""
                     guard !filePath.isEmpty else { continue }
-                    let oldStr = call.input["old_string"] as? String ?? ""
-                    let newStr = call.input["new_string"] as? String ?? ""
+                    var oldStr = call.input["old_string"] as? String ?? ""
+                    var newStr = call.input["new_string"] as? String ?? ""
+                    if oldStr.isEmpty && newStr.isEmpty {
+                        // Gemini edit_file: only code_edit available
+                        newStr = call.input["code_edit"] as? String ?? ""
+                    }
                     let added = countLines(newStr)
                     let removed = countLines(oldStr)
                     let language = detectLanguage(from: filePath)

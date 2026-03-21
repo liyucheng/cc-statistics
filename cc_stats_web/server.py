@@ -11,7 +11,12 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 
 from cc_stats.analyzer import SessionStats, TokenUsage, analyze_session, merge_stats
-from cc_stats.parser import find_sessions, parse_jsonl
+from cc_stats.parser import (
+    find_gemini_sessions,
+    find_sessions,
+    parse_gemini_json,
+    parse_jsonl,
+)
 
 _web_dir = os.path.join(os.path.dirname(__file__), "web")
 
@@ -23,11 +28,20 @@ _PRICING = {
     "gpt-4o": {"input": 2.5, "output": 10, "cache_read": 1.25, "cache_create": 2.5},
     "o1": {"input": 15, "output": 60, "cache_read": 7.5, "cache_create": 15},
     "o3": {"input": 10, "output": 40, "cache_read": 2.5, "cache_create": 10},
+    "gemini-2.5-pro": {"input": 1.25, "output": 10, "cache_read": 0.31, "cache_create": 1.25},
+    "gemini-2.5-flash": {"input": 0.15, "output": 0.60, "cache_read": 0.04, "cache_create": 0.15},
+    "gemini-2.0-flash": {"input": 0.10, "output": 0.40, "cache_read": 0.025, "cache_create": 0.10},
 }
 
 
 def _match_pricing(model: str) -> dict:
     lower = model.lower()
+    # Gemini models (exact match first)
+    for key in ("gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"):
+        if key in lower:
+            return _PRICING[key]
+    if "gemini" in lower:
+        return _PRICING["gemini-2.5-flash"]
     for key in ["opus", "haiku", "sonnet", "gpt-4o", "o1", "o3"]:
         if key in lower:
             return _PRICING[key]
@@ -132,49 +146,98 @@ def _stats_to_dict(stats: SessionStats, session_count: int = 1) -> dict:
 
 def _get_projects():
     from pathlib import Path
-    claude_projects = Path.home() / ".claude" / "projects"
-    if not claude_projects.exists():
-        return []
     projects = []
-    for proj in sorted(claude_projects.iterdir()):
-        if not proj.is_dir():
-            continue
-        jsonl_files = [f for f in proj.glob("*.jsonl") if not f.name.startswith("agent-")]
-        if not jsonl_files:
-            continue
-        display_name = _resolve_project_name(proj, jsonl_files)
-        projects.append({
-            "dir_name": proj.name,
-            "display_name": display_name,
-            "session_count": len(jsonl_files),
-        })
+
+    # Claude projects
+    claude_projects = Path.home() / ".claude" / "projects"
+    if claude_projects.exists():
+        for proj in sorted(claude_projects.iterdir()):
+            if not proj.is_dir():
+                continue
+            jsonl_files = [f for f in proj.glob("*.jsonl") if not f.name.startswith("agent-")]
+            if not jsonl_files:
+                continue
+            display_name = _resolve_project_name(proj, jsonl_files)
+            projects.append({
+                "dir_name": proj.name,
+                "display_name": display_name,
+                "session_count": len(jsonl_files),
+                "source": "claude",
+            })
+
+    # Gemini projects
+    gemini_files = find_gemini_sessions()
+    if gemini_files:
+        gemini_by_dir: dict[str, list] = {}
+        for gf in gemini_files:
+            dir_key = gf.parent.parent.name  # project hash
+            gemini_by_dir.setdefault(dir_key, []).append(gf)
+        for dir_key, files in gemini_by_dir.items():
+            # Try to get project path from first session
+            display_name = dir_key
+            try:
+                session = parse_gemini_json(files[0])
+                if session.project_path:
+                    display_name = session.project_path
+            except Exception:
+                pass
+            projects.append({
+                "dir_name": f"gemini:{dir_key}",
+                "display_name": display_name,
+                "session_count": len(files),
+                "source": "gemini",
+            })
+
     projects.sort(key=lambda x: x["session_count"], reverse=True)
     return projects
 
 
-def _get_stats(project_dir_name=None, since_days=None):
+def _collect_session_files(project_dir_name=None):
+    """Collect session files (Claude JSONL + Gemini JSON)"""
     from pathlib import Path
-    claude_projects = Path.home() / ".claude" / "projects"
+    files = []
 
-    if project_dir_name:
+    if project_dir_name and project_dir_name.startswith("gemini:"):
+        # Gemini project
+        dir_key = project_dir_name[7:]
+        for gf in find_gemini_sessions():
+            if gf.parent.parent.name == dir_key:
+                files.append(gf)
+    elif project_dir_name:
+        # Claude project
+        claude_projects = Path.home() / ".claude" / "projects"
         proj_dir = claude_projects / project_dir_name
-        jsonl_files = sorted(f for f in proj_dir.glob("*.jsonl") if not f.name.startswith("agent-"))
+        files = sorted(f for f in proj_dir.glob("*.jsonl") if not f.name.startswith("agent-"))
     else:
-        jsonl_files = [f for f in find_sessions() if not f.name.startswith("agent-")]
+        # All sources
+        files = [f for f in find_sessions() if not f.name.startswith("agent-")]
+        files.extend(find_gemini_sessions())
 
-    if not jsonl_files:
+    return files
+
+
+def _parse_session_file(f):
+    """Parse a session file based on its extension"""
+    if f.suffix == ".json":
+        return parse_gemini_json(f)
+    return parse_jsonl(f)
+
+
+def _get_stats(project_dir_name=None, since_days=None):
+    files = _collect_session_files(project_dir_name)
+    if not files:
         return {"error": "No sessions found"}
 
-    jsonl_files.sort(key=lambda f: f.stat().st_mtime)
+    files.sort(key=lambda f: f.stat().st_mtime)
 
     since_dt = None
     if since_days:
         since_dt = datetime.now(tz=timezone.utc) - timedelta(days=since_days)
 
     all_stats = []
-    for f in jsonl_files:
+    for f in files:
         try:
-            session = parse_jsonl(f)
+            session = _parse_session_file(f)
             stats = analyze_session(session)
             if since_dt and stats.end_time and stats.end_time < since_dt:
                 continue
@@ -190,21 +253,14 @@ def _get_stats(project_dir_name=None, since_days=None):
 
 
 def _get_daily_stats(project_dir_name=None, days=14):
-    from pathlib import Path
-    claude_projects = Path.home() / ".claude" / "projects"
-
-    if project_dir_name:
-        proj_dir = claude_projects / project_dir_name
-        jsonl_files = sorted(f for f in proj_dir.glob("*.jsonl") if not f.name.startswith("agent-"))
-    else:
-        jsonl_files = [f for f in find_sessions() if not f.name.startswith("agent-")]
+    files = _collect_session_files(project_dir_name)
 
     since_dt = datetime.now(tz=timezone.utc) - timedelta(days=days)
     daily: dict[str, list] = defaultdict(list)
 
-    for f in jsonl_files:
+    for f in files:
         try:
-            session = parse_jsonl(f)
+            session = _parse_session_file(f)
             stats = analyze_session(session)
             if stats.end_time and stats.end_time < since_dt:
                 continue

@@ -5,7 +5,14 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .parser import Message, Session, find_sessions, parse_jsonl
+from .parser import (
+    Message,
+    Session,
+    find_gemini_sessions,
+    find_sessions,
+    parse_gemini_json,
+    parse_jsonl,
+)
 
 
 def _extract_text(content) -> str:
@@ -113,8 +120,9 @@ def find_and_export(keyword: str, output: str | None = None,
         output: 输出文件路径（None 则输出到 stdout）
         include_tools: 是否包含工具调用
     """
-    # 搜索所有会话
-    all_files = find_sessions()
+    # 搜索所有会话（Claude + Gemini）
+    all_files: list[Path] = list(find_sessions())
+    all_files.extend(find_gemini_sessions())
 
     # 先按 session ID 前缀匹配
     matched = None
@@ -127,7 +135,9 @@ def find_and_export(keyword: str, output: str | None = None,
     if not matched:
         for f in sorted(all_files, key=lambda p: p.stat().st_mtime, reverse=True):
             try:
-                session = parse_jsonl(f)
+                session = (
+                    parse_gemini_json(f) if f.suffix == ".json" else parse_jsonl(f)
+                )
                 for msg in session.messages:
                     text = _extract_text(msg.content)
                     if keyword.lower() in text.lower():
@@ -141,7 +151,9 @@ def find_and_export(keyword: str, output: str | None = None,
     if not matched:
         return None
 
-    session = parse_jsonl(matched)
+    session = (
+        parse_gemini_json(matched) if matched.suffix == ".json" else parse_jsonl(matched)
+    )
     md = export_session(session, include_tools=include_tools)
 
     if output:

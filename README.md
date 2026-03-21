@@ -15,6 +15,12 @@ Claude Code 会话统计工具 — 从本地 `~/.claude/` 数据中提取 AI Cod
 
 <img src="docs/demo.gif" width="600" alt="CC Stats CLI Demo">
 
+## 请 cc 吃 Token
+
+如果这个工具对你有帮助，欢迎请 cc 吃点 Token :)
+
+<img src="docs/donate.jpg" width="200" alt="微信赞赏码">
+
 ## 核心亮点
 
 - **费用估算** — 根据 Opus / Sonnet / Haiku / GPT-4o 定价自动计算预估花费
@@ -150,9 +156,3 @@ cc-stats-app
 | 工具调用 | JSONL 中 assistant 消息的 `tool_use` 块 |
 | Token 用量 | JSONL 中 assistant 消息的 `usage` 字段 |
 | Git 变更 | 项目目录的 `git log --numstat` |
-
-## 请 cc 吃 Token
-
-如果这个工具对你有帮助，欢迎请 cc 吃点 Token :)
-
-<img src="docs/donate.jpg" width="200" alt="微信赞赏码">

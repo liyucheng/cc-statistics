@@ -9,7 +9,21 @@ from pathlib import Path
 
 from .analyzer import analyze_session, merge_stats
 from .formatter import format_stats
-from .parser import find_sessions, find_sessions_by_keyword, parse_jsonl
+from .parser import (
+    find_gemini_sessions,
+    find_gemini_sessions_by_keyword,
+    find_sessions,
+    find_sessions_by_keyword,
+    parse_gemini_json,
+    parse_jsonl,
+)
+
+
+def _parse_session(path: Path):
+    """根据文件类型选择解析器"""
+    if path.suffix == ".json":
+        return parse_gemini_json(path)
+    return parse_jsonl(path)
 
 
 def _parse_time_arg(value: str) -> datetime:
@@ -88,7 +102,7 @@ def _compare_projects(args) -> None:
         all_stats = []
         for f in jsonl_files:
             try:
-                session = parse_jsonl(f)
+                session = _parse_session(f)
                 stats = analyze_session(session)
 
                 # 时间过滤
@@ -161,29 +175,54 @@ def _compare_projects(args) -> None:
 
 
 def _list_projects() -> None:
-    """列出所有已知项目"""
-    claude_projects = Path.home() / ".claude" / "projects"
-    if not claude_projects.exists():
-        print("未找到 Claude Code 项目数据")
-        return
+    """列出所有已知项目（Claude + Gemini）"""
+    has_any = False
 
-    print("\n可用项目:")
-    print("─" * 60)
-    for proj in sorted(claude_projects.iterdir()):
-        if not proj.is_dir():
-            continue
-        jsonl_files = list(proj.glob("*.jsonl"))
-        if not jsonl_files:
-            continue
-        display_name = _resolve_project_name(proj, jsonl_files)
-        print(f"  {display_name}  ({len(jsonl_files)} 个会话)")
+    # Claude 项目
+    claude_projects = Path.home() / ".claude" / "projects"
+    if claude_projects.exists():
+        print("\n可用项目 (Claude Code):")
+        print("─" * 60)
+        for proj in sorted(claude_projects.iterdir()):
+            if not proj.is_dir():
+                continue
+            jsonl_files = list(proj.glob("*.jsonl"))
+            if not jsonl_files:
+                continue
+            display_name = _resolve_project_name(proj, jsonl_files)
+            print(f"  {display_name}  ({len(jsonl_files)} 个会话)")
+            has_any = True
+
+    # Gemini 项目
+    gemini_sessions = find_gemini_sessions()
+    if gemini_sessions:
+        # 按项目目录分组
+        from collections import defaultdict
+        gemini_by_dir: dict[str, list[Path]] = defaultdict(list)
+        for gf in gemini_sessions:
+            try:
+                session = parse_gemini_json(gf)
+                key = session.project_path or gf.parent.parent.name
+            except Exception:
+                key = gf.parent.parent.name
+            gemini_by_dir[key].append(gf)
+
+        print("\n可用项目 (Gemini CLI):")
+        print("─" * 60)
+        for name, files in sorted(gemini_by_dir.items()):
+            display = Path(name).name if "/" in name else name
+            print(f"  {display}  ({len(files)} 个会话)")
+            has_any = True
+
+    if not has_any:
+        print("未找到项目数据")
     print()
 
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         prog="cc-stats",
-        description="Claude Code 会话统计工具 — 分析 AI Coding 工程指标",
+        description="AI Coding 会话统计工具 — 支持 Claude Code / Gemini CLI",
     )
     parser.add_argument(
         "path",
@@ -288,41 +327,43 @@ def main(argv: list[str] | None = None) -> None:
         _list_projects()
         return
 
-    # 确定要分析的 JSONL 文件
-    jsonl_files: list[Path] = []
+    # 确定要分析的会话文件（Claude JSONL + Gemini JSON）
+    session_files: list[Path] = []
 
     if args.path:
         p = Path(args.path)
-        if p.is_file() and p.suffix == ".jsonl":
-            jsonl_files = [p]
+        if p.is_file() and p.suffix in (".jsonl", ".json"):
+            session_files = [p]
         elif p.is_dir():
-            jsonl_files = find_sessions(p)
-        if not jsonl_files:
-            # 作为关键词模糊搜索（同时搜索目录名和 JSONL 中的 cwd）
-            jsonl_files = find_sessions_by_keyword(args.path)
-        if not jsonl_files:
+            session_files = find_sessions(p)
+        if not session_files:
+            # 作为关键词模糊搜索（Claude + Gemini）
+            session_files = find_sessions_by_keyword(args.path)
+            session_files.extend(find_gemini_sessions_by_keyword(args.path))
+        if not session_files:
             print(f"找不到: {args.path}", file=sys.stderr)
             sys.exit(1)
     elif args.all:
-        jsonl_files = find_sessions()
+        session_files = find_sessions()
+        session_files.extend(find_gemini_sessions())
     else:
         # 默认：当前目录
-        jsonl_files = find_sessions(Path.cwd())
+        session_files = find_sessions(Path.cwd())
 
-    if not jsonl_files:
-        print("未找到 JSONL 会话文件。使用 --list 查看可用项目。", file=sys.stderr)
+    if not session_files:
+        print("未找到会话文件。使用 --list 查看可用项目。", file=sys.stderr)
         sys.exit(1)
 
     # 按修改时间排序
-    jsonl_files.sort(key=lambda f: f.stat().st_mtime)
+    session_files.sort(key=lambda f: f.stat().st_mtime)
 
     if args.last:
-        jsonl_files = jsonl_files[-args.last:]
+        session_files = session_files[-args.last:]
 
     # 解析 & 分析（按时间范围过滤）
     all_stats = []
-    for f in jsonl_files:
-        session = parse_jsonl(f)
+    for f in session_files:
+        session = _parse_session(f)
         stats = analyze_session(session)
 
         # --since: 跳过结束时间在 since 之前的会话

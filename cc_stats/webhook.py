@@ -9,20 +9,21 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from .analyzer import SessionStats, analyze_session, merge_stats
-from .parser import find_sessions, parse_jsonl
+from .parser import find_gemini_sessions, find_sessions, parse_gemini_json, parse_jsonl
 
 
 def _collect_today_stats() -> SessionStats | None:
-    """收集今天的统计数据"""
+    """收集今天的统计数据（Claude + Gemini）"""
     today_start = datetime.now(tz=timezone.utc).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
-    all_files = find_sessions()
+    all_files: list = list(find_sessions())
+    all_files.extend(find_gemini_sessions())
     today_stats = []
 
     for f in all_files:
         try:
-            session = parse_jsonl(f)
+            session = parse_gemini_json(f) if f.suffix == ".json" else parse_jsonl(f)
             stats = analyze_session(session)
             if stats.end_time and stats.end_time >= today_start:
                 today_stats.append(stats)
@@ -39,20 +40,31 @@ def _estimate_cost(stats: SessionStats) -> float:
         "claude-opus-4": {"input": 15, "output": 75, "cache_read": 1.5, "cache_create": 18.75},
         "claude-sonnet-4": {"input": 3, "output": 15, "cache_read": 0.3, "cache_create": 3.75},
         "claude-haiku-4": {"input": 0.8, "output": 4, "cache_read": 0.08, "cache_create": 1},
+        "gemini-2.5-pro": {"input": 1.25, "output": 10, "cache_read": 0.31, "cache_create": 1.25},
+        "gemini-2.5-flash": {"input": 0.15, "output": 0.60, "cache_read": 0.04, "cache_create": 0.15},
+        "gemini-2.0-flash": {"input": 0.10, "output": 0.40, "cache_read": 0.025, "cache_create": 0.10},
     }
     cost = 0.0
     for model, usage in stats.token_by_model.items():
-        p = MODEL_PRICING.get("claude-opus-4")  # default
         lower = model.lower()
-        for key in MODEL_PRICING:
-            if key.split("-")[1] in lower:
+        p = None
+        # Gemini 模型精确匹配
+        for key in ("gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"):
+            if key in lower:
                 p = MODEL_PRICING[key]
                 break
-        if p:
-            cost += usage.input_tokens / 1e6 * p["input"]
-            cost += usage.output_tokens / 1e6 * p["output"]
-            cost += usage.cache_read_input_tokens / 1e6 * p["cache_read"]
-            cost += usage.cache_creation_input_tokens / 1e6 * p["cache_create"]
+        # Claude 模型关键词匹配
+        if not p:
+            for key in MODEL_PRICING:
+                if key.startswith("claude-") and key.split("-")[1] in lower:
+                    p = MODEL_PRICING[key]
+                    break
+        if not p:
+            p = MODEL_PRICING.get("gemini-2.5-flash") if "gemini" in lower else MODEL_PRICING["claude-opus-4"]
+        cost += usage.input_tokens / 1e6 * p["input"]
+        cost += usage.output_tokens / 1e6 * p["output"]
+        cost += usage.cache_read_input_tokens / 1e6 * p["cache_read"]
+        cost += usage.cache_creation_input_tokens / 1e6 * p["cache_create"]
     return cost
 
 

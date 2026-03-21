@@ -1,4 +1,4 @@
-"""解析 Claude Code JSONL 会话文件"""
+"""解析 Claude Code JSONL / Gemini CLI JSON 会话文件"""
 
 from __future__ import annotations
 
@@ -33,6 +33,7 @@ class Session:
     session_id: str
     project_path: str
     file_path: Path
+    source: str = "claude"  # "claude" | "gemini"
     messages: list[Message] = field(default_factory=list)
 
 
@@ -178,5 +179,153 @@ def find_sessions_by_keyword(keyword: str) -> list[Path]:
                     break  # matched, stop checking more files
             except OSError:
                 continue
+
+    return results
+
+
+# ── Gemini CLI 解析 ──────────────────────────────────────────
+
+# Gemini 工具名映射为 cc-stats 内部统一名称
+_GEMINI_TOOL_MAP: dict[str, str] = {
+    "read_file": "Read",
+    "read_many_files": "Read",
+    "edit_file": "Edit",
+    "write_file": "Write",
+    "shell": "Bash",
+    "glob": "Glob",
+    "grep": "Grep",
+    "list_directory": "Glob",
+    "web_search": "WebSearch",
+    "web_fetch": "WebFetch",
+}
+
+
+def parse_gemini_json(path: Path) -> Session:
+    """解析 Gemini CLI 的 JSON 会话文件为 Session 对象
+
+    Gemini 会话格式：单个 JSON 文件，包含 sessionId、messages[] 等字段。
+    消息类型：user / gemini / info / error / warning
+    """
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+
+    session_id = data.get("sessionId", path.stem)
+    # 尝试从 directories 字段获取项目路径
+    dirs = data.get("directories", [])
+    project_path = dirs[0] if dirs else ""
+
+    messages: list[Message] = []
+
+    for msg_record in data.get("messages", []):
+        msg_type = msg_record.get("type", "")
+        timestamp = msg_record.get("timestamp", "")
+
+        if msg_type == "user":
+            content = _extract_gemini_content(msg_record.get("content"))
+            messages.append(Message(
+                role="user",
+                timestamp=timestamp,
+                content=content,
+                session_id=session_id,
+            ))
+
+        elif msg_type == "gemini":
+            content = _extract_gemini_content(msg_record.get("content"))
+            model = msg_record.get("model", "")
+
+            # 提取工具调用
+            tool_calls: list[ToolCall] = []
+            for tc in msg_record.get("toolCalls", []):
+                raw_name = tc.get("name", "")
+                mapped_name = _GEMINI_TOOL_MAP.get(raw_name, raw_name)
+                tool_calls.append(ToolCall(
+                    name=mapped_name,
+                    input=tc.get("args", {}),
+                    timestamp=tc.get("timestamp", timestamp),
+                ))
+
+            # 转换 token 用量为 cc-stats 统一格式
+            usage: dict[str, Any] = {}
+            tokens = msg_record.get("tokens")
+            if tokens and isinstance(tokens, dict):
+                usage = {
+                    "input_tokens": tokens.get("input", 0),
+                    "output_tokens": tokens.get("output", 0),
+                    "cache_read_input_tokens": tokens.get("cached", 0),
+                    "cache_creation_input_tokens": 0,
+                }
+
+            messages.append(Message(
+                role="assistant",
+                timestamp=timestamp,
+                content=content,
+                model=model,
+                usage=usage,
+                tool_calls=tool_calls,
+                session_id=session_id,
+            ))
+
+        # info / error / warning 类型跳过（非对话消息）
+
+    return Session(
+        session_id=session_id,
+        project_path=project_path,
+        file_path=path,
+        source="gemini",
+        messages=messages,
+    )
+
+
+def _extract_gemini_content(raw: Any) -> Any:
+    """提取 Gemini 消息内容（可能是字符串或 Part 列表）"""
+    if isinstance(raw, str):
+        return raw
+    if isinstance(raw, list):
+        texts = []
+        for part in raw:
+            if isinstance(part, dict) and "text" in part:
+                texts.append(part["text"])
+        return "\n".join(texts) if texts else raw
+    return raw or ""
+
+
+def find_gemini_sessions() -> list[Path]:
+    """查找 ~/.gemini/tmp/*/chats/*.json 会话文件"""
+    gemini_dir = Path.home() / ".gemini" / "tmp"
+    if not gemini_dir.exists():
+        return []
+
+    results: list[Path] = []
+    for chats_dir in gemini_dir.glob("*/chats"):
+        if not chats_dir.is_dir():
+            continue
+        for json_file in sorted(chats_dir.glob("*.json")):
+            results.append(json_file)
+
+    return results
+
+
+def find_gemini_sessions_by_keyword(keyword: str) -> list[Path]:
+    """按关键词搜索 Gemini 会话（在 directories 和内容中搜索）"""
+    all_sessions = find_gemini_sessions()
+    if not all_sessions:
+        return []
+
+    keyword_lower = keyword.lower()
+    results: list[Path] = []
+
+    for path in all_sessions:
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+            dirs = data.get("directories", [])
+            if any(keyword_lower in d.lower() for d in dirs):
+                results.append(path)
+                continue
+            summary = data.get("summary", "")
+            if summary and keyword_lower in summary.lower():
+                results.append(path)
+        except (json.JSONDecodeError, OSError):
+            continue
 
     return results

@@ -7,21 +7,33 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from .analyzer import SessionStats, merge_stats, analyze_session
-from .parser import find_sessions, parse_jsonl
+from .parser import find_gemini_sessions, find_sessions, parse_gemini_json, parse_jsonl
 
 # 模型定价 ($/M tokens)
 _PRICING = {
     "opus": {"input": 15, "output": 75, "cache_read": 1.5, "cache_create": 18.75},
     "sonnet": {"input": 3, "output": 15, "cache_read": 0.3, "cache_create": 3.75},
     "haiku": {"input": 0.8, "output": 4, "cache_read": 0.08, "cache_create": 1.0},
+    # Gemini 模型定价
+    "gemini-2.5-pro": {"input": 1.25, "output": 10, "cache_read": 0.31, "cache_create": 1.25},
+    "gemini-2.5-flash": {"input": 0.15, "output": 0.60, "cache_read": 0.04, "cache_create": 0.15},
+    "gemini-2.0-flash": {"input": 0.10, "output": 0.40, "cache_read": 0.025, "cache_create": 0.10},
 }
 
 
 def _match_pricing(model: str) -> dict:
     lower = model.lower()
+    # Gemini 模型：精确匹配
+    for key in ("gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"):
+        if key in lower:
+            return _PRICING[key]
+    # Claude 模型：关键词匹配
     for key in ["opus", "haiku", "sonnet"]:
         if key in lower:
             return _PRICING[key]
+    # 默认按 Sonnet 估算
+    if "gemini" in lower:
+        return _PRICING["gemini-2.5-flash"]
     return _PRICING["sonnet"]
 
 
@@ -91,16 +103,19 @@ def generate_report(period: str = "week") -> str:
     start_str = since.astimezone().strftime("%Y-%m-%d")
     end_str = now.astimezone().strftime("%Y-%m-%d")
 
-    # 收集所有会话
-    jsonl_files = [f for f in find_sessions() if not f.name.startswith("agent-")]
-    jsonl_files.sort(key=lambda f: f.stat().st_mtime)
+    # 收集所有会话（Claude + Gemini）
+    session_files: list[Path] = [
+        f for f in find_sessions() if not f.name.startswith("agent-")
+    ]
+    session_files.extend(find_gemini_sessions())
+    session_files.sort(key=lambda f: f.stat().st_mtime)
 
     all_stats: list[SessionStats] = []
     daily: dict[str, list[SessionStats]] = defaultdict(list)
 
-    for f in jsonl_files:
+    for f in session_files:
         try:
-            session = parse_jsonl(f)
+            session = parse_gemini_json(f) if f.suffix == ".json" else parse_jsonl(f)
             stats = analyze_session(session)
             if stats.end_time and stats.end_time < since:
                 continue
@@ -240,9 +255,9 @@ def generate_report(period: str = "week") -> str:
     # 对比上一周期
     prev_since = since - timedelta(days=days)
     prev_stats: list[SessionStats] = []
-    for f in jsonl_files:
+    for f in session_files:
         try:
-            session = parse_jsonl(f)
+            session = parse_gemini_json(f) if f.suffix == ".json" else parse_jsonl(f)
             stats_item = analyze_session(session)
             if stats_item.end_time and prev_since <= stats_item.end_time < since:
                 prev_stats.append(stats_item)

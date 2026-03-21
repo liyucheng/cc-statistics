@@ -140,18 +140,24 @@ final class StatsViewModel: ObservableObject {
             let result: ([ProjectInfo], [Session]) = await Task.detached(priority: .userInitiated) {
                 let claudeParser = SessionParser()
                 let codexParser = CodexParser()
+                let geminiParser = GeminiParser()
 
                 var projects: [ProjectInfo] = []
                 var sessions: [Session] = []
 
                 switch currentSource {
                 case .all:
-                    projects = claudeParser.findAllProjects() + codexParser.findAllProjects()
+                    projects = claudeParser.findAllProjects()
+                        + codexParser.findAllProjects()
+                        + geminiParser.findAllProjects()
                     if let project = currentProject {
                         sessions = claudeParser.parseSessions(forProject: project.path)
                             + codexParser.parseSessions(forProject: project.path)
+                            + geminiParser.parseSessions(forProject: project.path)
                     } else {
-                        sessions = claudeParser.parseAllSessions() + codexParser.parseAllSessions()
+                        sessions = claudeParser.parseAllSessions()
+                            + codexParser.parseAllSessions()
+                            + geminiParser.parseAllSessions()
                     }
                 case .claudeCode:
                     projects = claudeParser.findAllProjects()
@@ -166,6 +172,13 @@ final class StatsViewModel: ObservableObject {
                         sessions = codexParser.parseSessions(forProject: project.path)
                     } else {
                         sessions = codexParser.parseAllSessions()
+                    }
+                case .gemini:
+                    projects = geminiParser.findAllProjects()
+                    if let project = currentProject {
+                        sessions = geminiParser.parseSessions(forProject: project.path)
+                    } else {
+                        sessions = geminiParser.parseAllSessions()
                     }
                 case .cursor:
                     projects = claudeParser.findAllProjects()

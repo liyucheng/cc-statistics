@@ -186,6 +186,7 @@ class StatusBarController {
     private var iconView: NSImageView!
     private var label1: NSTextField!
     private var label2: NSTextField!
+    private var container: NSStackView!
 
     init(onToggle: @escaping () -> Void, onToggleChat: @escaping () -> Void) {
         self.onToggle = onToggle
@@ -227,10 +228,10 @@ class StatusBarController {
             container.translatesAutoresizingMaskIntoConstraints = false
 
             button.addSubview(container)
+            // 不约束 trailing — 让 container 自然撑开，由 refreshLabel 手动设置 statusItem.length
             NSLayoutConstraint.activate([
                 container.centerYAnchor.constraint(equalTo: button.centerYAnchor),
                 container.leadingAnchor.constraint(equalTo: button.leadingAnchor, constant: 4),
-                container.trailingAnchor.constraint(equalTo: button.trailingAnchor, constant: -4),
                 icon.widthAnchor.constraint(equalToConstant: 22),
                 icon.heightAnchor.constraint(equalToConstant: 22),
             ])
@@ -238,6 +239,7 @@ class StatusBarController {
             self.iconView = icon
             self.label1 = l1
             self.label2 = l2
+            self.container = container
         }
     }
 
@@ -353,6 +355,11 @@ class StatusBarController {
         label1.stringValue = line1
         label2.stringValue = line2
         label2.isHidden = line2.isEmpty
+
+        // macOS 12 不会自动根据子视图调整 statusItem 宽度，需手动计算
+        container.layoutSubtreeIfNeeded()
+        let fittingWidth = container.fittingSize.width + 8  // 4px padding each side
+        statusItem.length = max(30, fittingWidth)  // 至少 30pt（仅图标时）
     }
 
     private static func formatTokens(_ n: Int) -> String {
