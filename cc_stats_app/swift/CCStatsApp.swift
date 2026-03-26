@@ -384,6 +384,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Initialize notification system (requests authorization + sets delegate)
+        NotificationManager.shared.requestAuthorization()
+
         setupStatusBar()
         setupGlobalHotkey()
         observeConversationPanel()

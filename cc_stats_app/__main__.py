@@ -220,6 +220,7 @@ def _compile_swift():
             "-framework", "Cocoa",
             "-framework", "SwiftUI",
             "-framework", "Carbon",
+            "-framework", "UserNotifications",
             "-lsqlite3",
             "-O",
         ],
