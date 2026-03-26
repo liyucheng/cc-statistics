@@ -342,7 +342,7 @@ class StatusBarController {
                 .font: font,
                 .foregroundColor: textColor,
                 .paragraphStyle: paraStyle,
-                .baselineOffset: 0.5,
+                .baselineOffset: -2.0,
             ]
             button.attributedTitle = NSAttributedString(string: line1, attributes: attrs)
         } else {
@@ -355,7 +355,7 @@ class StatusBarController {
                 .font: font,
                 .foregroundColor: textColor,
                 .paragraphStyle: paraStyle,
-                .baselineOffset: 0.5,
+                .baselineOffset: -2.0,
             ]
             button.attributedTitle = NSAttributedString(string: "\(line1)\n\(line2)", attributes: attrs)
         }
