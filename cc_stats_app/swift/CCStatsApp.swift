@@ -381,11 +381,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var mainWindow: NSWindow?
     var hotkeyManager: HotkeyManager?
     var eventMonitor: Any?
+    private let notificationServer = NotificationServer()
     private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Initialize notification system (requests authorization + sets delegate)
         NotificationManager.shared.requestAuthorization()
+
+        // Start local HTTP server so Python hooks can send native notifications
+        notificationServer.start()
 
         setupStatusBar()
         setupGlobalHotkey()

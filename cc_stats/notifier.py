@@ -15,6 +15,8 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +27,10 @@ from typing import Any
 
 _CONFIG_DIR = Path.home() / ".cc-stats"
 _CONFIG_FILE = _CONFIG_DIR / "notify_config.json"
+
+# cc-stats-app local HTTP server for native UNUserNotificationCenter
+_NATIVE_NOTIFY_PORT = 19852
+_NATIVE_NOTIFY_URL = f"http://localhost:{_NATIVE_NOTIFY_PORT}/notify"
 
 _DEFAULT_CONFIG: dict[str, Any] = {
     "enabled": True,
@@ -159,8 +165,9 @@ def send_notification(
     if sound is None:
         sound = config.get("sound", "Glass")
 
-    # 发送 macOS 通知
-    sent = _send_osascript(title, body, sound)
+    # 优先通过 cc-stats-app 原生通知（UNUserNotificationCenter）
+    # 失败则 fallback 到 osascript
+    sent = _send_native(title, body) or _send_osascript(title, body, sound)
 
     # 同时发送 webhook（如果配置了）
     webhook_url = config.get("webhook_url", "")
@@ -168,6 +175,26 @@ def send_notification(
         _send_webhook(title, body, webhook_url, config.get("webhook_platform", "auto"))
 
     return sent
+
+
+def _send_native(title: str, body: str) -> bool:
+    """通过 cc-stats-app 的本地 HTTP server 发送原生通知
+
+    如果 cc-stats-app 没有运行（连接失败），返回 False，
+    调用方应 fallback 到 osascript。
+    """
+    payload = json.dumps({"title": title, "body": body}, ensure_ascii=False).encode()
+    req = urllib.request.Request(
+        _NATIVE_NOTIFY_URL,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=2) as resp:
+            return resp.status == 200
+    except (urllib.error.URLError, OSError):
+        return False
 
 
 def _send_osascript(title: str, body: str, sound: str = "Glass") -> bool:
@@ -194,9 +221,6 @@ def _send_webhook(
     title: str, body: str, webhook_url: str, platform: str = "auto",
 ) -> bool:
     """转发通知到 webhook"""
-    import urllib.request
-    import urllib.error
-
     # 自动检测平台
     if platform == "auto":
         if "feishu.cn" in webhook_url or "larksuite.com" in webhook_url:

@@ -8,10 +8,12 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch, call
 
 from cc_stats.notifier import (
+    _send_native,
     _send_osascript,
     _escape_applescript,
     send_notification,
     load_config,
+    _NATIVE_NOTIFY_URL,
 )
 
 
@@ -67,14 +69,52 @@ class TestSendOsascript(unittest.TestCase):
         assert '\\"' not in script or '\\\\"' in script  # quotes escaped
 
 
+class TestSendNative(unittest.TestCase):
+    """原生通知（通过 cc-stats-app HTTP server）"""
+
+    @patch("cc_stats.notifier.urllib.request.urlopen")
+    def test_send_native_success(self, mock_urlopen: MagicMock) -> None:
+        mock_resp = MagicMock()
+        mock_resp.status = 200
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value = mock_resp
+
+        result = _send_native("Title", "Body")
+        assert result is True
+        # Verify the request was made to the correct URL
+        req = mock_urlopen.call_args[0][0]
+        assert req.full_url == _NATIVE_NOTIFY_URL
+        assert req.method == "POST"
+
+    @patch("cc_stats.notifier.urllib.request.urlopen", side_effect=OSError("refused"))
+    def test_send_native_connection_refused(self, mock_urlopen: MagicMock) -> None:
+        """cc-stats-app 未运行时应返回 False"""
+        result = _send_native("Title", "Body")
+        assert result is False
+
+    @patch("cc_stats.notifier.urllib.request.urlopen")
+    def test_send_native_non_200(self, mock_urlopen: MagicMock) -> None:
+        mock_resp = MagicMock()
+        mock_resp.status = 400
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value = mock_resp
+
+        result = _send_native("Title", "Body")
+        assert result is False
+
+
 class TestSendNotification(unittest.TestCase):
     """send_notification 集成路径"""
 
     @patch("cc_stats.notifier._send_osascript", return_value=True)
+    @patch("cc_stats.notifier._send_native", return_value=True)
     @patch("cc_stats.notifier.load_config")
     @patch("cc_stats.notifier.is_terminal_focused", return_value=False)
-    def test_sends_when_enabled(
-        self, mock_focus: MagicMock, mock_config: MagicMock, mock_send: MagicMock
+    def test_uses_native_when_available(
+        self, mock_focus: MagicMock, mock_config: MagicMock,
+        mock_native: MagicMock, mock_osascript: MagicMock,
     ) -> None:
         mock_config.return_value = {
             "enabled": True,
@@ -85,23 +125,49 @@ class TestSendNotification(unittest.TestCase):
         }
         result = send_notification("Title", "Body", notify_type="session_complete")
         assert result is True
-        mock_send.assert_called_once()
+        mock_native.assert_called_once_with("Title", "Body")
+        # osascript should NOT be called when native succeeds
+        mock_osascript.assert_not_called()
 
+    @patch("cc_stats.notifier._send_osascript", return_value=True)
+    @patch("cc_stats.notifier._send_native", return_value=False)
+    @patch("cc_stats.notifier.load_config")
+    @patch("cc_stats.notifier.is_terminal_focused", return_value=False)
+    def test_falls_back_to_osascript(
+        self, mock_focus: MagicMock, mock_config: MagicMock,
+        mock_native: MagicMock, mock_osascript: MagicMock,
+    ) -> None:
+        mock_config.return_value = {
+            "enabled": True,
+            "session_complete": True,
+            "smart_suppress": True,
+            "sound": "Glass",
+            "webhook_url": "",
+        }
+        result = send_notification("Title", "Body", notify_type="session_complete")
+        assert result is True
+        mock_native.assert_called_once()
+        mock_osascript.assert_called_once()
+
+    @patch("cc_stats.notifier._send_native")
     @patch("cc_stats.notifier._send_osascript")
     @patch("cc_stats.notifier.load_config")
     def test_disabled_returns_false(
-        self, mock_config: MagicMock, mock_send: MagicMock
+        self, mock_config: MagicMock, mock_osascript: MagicMock, mock_native: MagicMock,
     ) -> None:
         mock_config.return_value = {"enabled": False}
         result = send_notification("Title", "Body", notify_type="session_complete")
         assert result is False
-        mock_send.assert_not_called()
+        mock_native.assert_not_called()
+        mock_osascript.assert_not_called()
 
+    @patch("cc_stats.notifier._send_native")
     @patch("cc_stats.notifier._send_osascript")
     @patch("cc_stats.notifier.load_config")
     @patch("cc_stats.notifier.is_terminal_focused", return_value=True)
     def test_suppressed_when_terminal_focused(
-        self, mock_focus: MagicMock, mock_config: MagicMock, mock_send: MagicMock
+        self, mock_focus: MagicMock, mock_config: MagicMock,
+        mock_osascript: MagicMock, mock_native: MagicMock,
     ) -> None:
         mock_config.return_value = {
             "enabled": True,
@@ -112,13 +178,16 @@ class TestSendNotification(unittest.TestCase):
         }
         result = send_notification("Title", "Body", notify_type="session_complete")
         assert result is False
-        mock_send.assert_not_called()
+        mock_native.assert_not_called()
+        mock_osascript.assert_not_called()
 
     @patch("cc_stats.notifier._send_osascript", return_value=True)
+    @patch("cc_stats.notifier._send_native", return_value=False)
     @patch("cc_stats.notifier.load_config")
     @patch("cc_stats.notifier.is_terminal_focused", return_value=False)
     def test_cost_alert_sent_when_not_focused(
-        self, mock_focus: MagicMock, mock_config: MagicMock, mock_send: MagicMock
+        self, mock_focus: MagicMock, mock_config: MagicMock,
+        mock_native: MagicMock, mock_osascript: MagicMock,
     ) -> None:
         mock_config.return_value = {
             "enabled": True,
@@ -129,12 +198,12 @@ class TestSendNotification(unittest.TestCase):
         }
         result = send_notification("Alert", "Over budget", notify_type="cost_alert")
         assert result is True
-        mock_send.assert_called_once()
 
     @patch("cc_stats.notifier._send_osascript", return_value=True)
+    @patch("cc_stats.notifier._send_native", return_value=False)
     @patch("cc_stats.notifier.load_config")
     def test_force_bypasses_suppression(
-        self, mock_config: MagicMock, mock_send: MagicMock
+        self, mock_config: MagicMock, mock_native: MagicMock, mock_osascript: MagicMock,
     ) -> None:
         mock_config.return_value = {
             "enabled": True,
@@ -145,7 +214,6 @@ class TestSendNotification(unittest.TestCase):
         }
         result = send_notification("T", "B", notify_type="session_complete", force=True)
         assert result is True
-        mock_send.assert_called_once()
 
 
 class TestLoadConfig(unittest.TestCase):
