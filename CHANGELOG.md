@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.12.2 (2026-03-26)
+
+### Bug Fixes
+- Fix status bar Auto Layout infinite loop causing 60%+ CPU usage
+- Fix status bar text vertical centering
+- Use native UNUserNotificationCenter for test notifications instead of osascript
+- Auto-request notification authorization on first send
+
 ## v0.12.1 (2026-03-26)
 
 ### Bug Fixes

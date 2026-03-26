@@ -47,28 +47,42 @@ final class NotificationManager: NSObject, ObservableObject {
 
     // MARK: - Send Notification
 
-    /// Send a native notification. Falls back to osascript if not authorized.
+    /// Send a native notification. Requests authorization if needed, falls back to osascript on failure.
     func send(title: String, body: String) {
-        guard isAuthorized else {
-            sendOsascriptFallback(title: title, body: body)
-            return
+        let sendNative = { [weak self] in
+            guard let self else { return }
+            let content = UNMutableNotificationContent()
+            content.title = title
+            content.body = body
+            content.sound = .default
+            content.categoryIdentifier = "CC_STATS"
+
+            let request = UNNotificationRequest(
+                identifier: "cc-stats-\(UUID().uuidString)",
+                content: content,
+                trigger: nil
+            )
+
+            self.center.add(request) { [weak self] error in
+                if error != nil {
+                    self?.sendOsascriptFallback(title: title, body: body)
+                }
+            }
         }
 
-        let content = UNMutableNotificationContent()
-        content.title = title
-        content.body = body
-        content.sound = .default
-        content.categoryIdentifier = "CC_STATS"
-
-        let request = UNNotificationRequest(
-            identifier: "cc-stats-\(UUID().uuidString)",
-            content: content,
-            trigger: nil
-        )
-
-        center.add(request) { [weak self] error in
-            if error != nil {
-                self?.sendOsascriptFallback(title: title, body: body)
+        if isAuthorized {
+            sendNative()
+        } else {
+            // Request authorization first, then send or fallback
+            center.requestAuthorization(options: [.alert, .sound]) { [weak self] granted, _ in
+                Task { @MainActor in
+                    self?.isAuthorized = granted
+                    if granted {
+                        sendNative()
+                    } else {
+                        self?.sendOsascriptFallback(title: title, body: body)
+                    }
+                }
             }
         }
     }

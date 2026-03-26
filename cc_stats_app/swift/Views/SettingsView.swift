@@ -494,7 +494,7 @@ struct SettingsView: View {
 
     // MARK: - Version
 
-    static let fallbackVersion = "0.12.1"
+    static let fallbackVersion = "0.12.2"
 
     /// 动态读取 Python 层写入的版本号，fallback 到编译时默认值
     static var appVersion: String {
@@ -709,17 +709,9 @@ struct SettingsView: View {
     }
 
     private func sendTestNotification() {
-        let safeTitle = "CC Stats 通知测试"
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
-        let safeBody = (L10n.isChinese ? "通知功能正常工作 ✓" : "Notification is working ✓")
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
-        let script = "display notification \"\(safeBody)\" with title \"\(safeTitle)\" sound name \"Glass\""
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-        process.arguments = ["-e", script]
-        try? process.run()
+        let title = "CC Stats 通知测试"
+        let body = L10n.isChinese ? "通知功能正常工作 ✓" : "Notification is working ✓"
+        NotificationManager.shared.send(title: title, body: body)
         notifyTestSent = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             notifyTestSent = false
