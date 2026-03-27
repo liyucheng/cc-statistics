@@ -264,6 +264,7 @@ struct DashboardView: View {
                         codeChangesSection(stats: stats)
                         tokenUsageSection(stats: stats)
                         toolCallsSection(stats: stats)
+                        skillStatsSection(stats: stats)
                         efficiencySection(stats: stats)
                         costPredictionSection(stats: stats)
                         processSection
@@ -525,6 +526,70 @@ struct DashboardView: View {
                             color: Theme.barGradientColors[index % Theme.barGradientColors.count],
                             rank: index + 1
                         )
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Skill Stats Section
+
+    @ViewBuilder
+    private func skillStatsSection(stats: SessionStats) -> some View {
+        let sortedSkills = stats.skillStats.values
+            .sorted { $0.callCount > $1.callCount }
+
+        if !sortedSkills.isEmpty {
+            GlassCard {
+                VStack(alignment: .leading, spacing: 8) {
+                    SectionHeader(
+                        icon: "command.circle.fill",
+                        title: L10n.isChinese ? "Skill 使用" : "Skill Usage",
+                        accentColor: Theme.pink,
+                        helpText: L10n.isChinese
+                            ? "各 Skill 的调用次数和成功率"
+                            : "Call count and success rate for each Skill"
+                    )
+
+                    let maxCount = sortedSkills.first?.callCount ?? 1
+
+                    VStack(spacing: 4) {
+                        ForEach(Array(sortedSkills.prefix(10).enumerated()), id: \.offset) { index, skill in
+                            HStack(spacing: 6) {
+                                Text(skill.name)
+                                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                                    .foregroundColor(Theme.textSecondary)
+                                    .frame(width: 90, alignment: .trailing)
+                                    .lineLimit(1)
+
+                                GeometryReader { geo in
+                                    let width = max(2, geo.size.width * CGFloat(skill.callCount) / CGFloat(maxCount))
+                                    RoundedRectangle(cornerRadius: 2)
+                                        .fill(Theme.barGradientColors[index % Theme.barGradientColors.count].opacity(0.5))
+                                        .frame(width: width)
+                                }
+                                .frame(height: 14)
+
+                                Text("\(skill.callCount)")
+                                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                                    .foregroundColor(Theme.textTertiary)
+                                    .frame(width: 28, alignment: .trailing)
+
+                                // Success rate badge
+                                if let rate = skill.successRate {
+                                    Text("\(rate)%")
+                                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                        .foregroundColor(rate >= 90 ? Theme.green : rate >= 70 ? Theme.amber : Theme.red)
+                                        .frame(width: 32, alignment: .trailing)
+                                } else {
+                                    Text("—")
+                                        .font(.system(size: 9, weight: .medium))
+                                        .foregroundColor(Theme.textTertiary)
+                                        .frame(width: 32, alignment: .trailing)
+                                }
+                            }
+                            .frame(height: 18)
+                        }
                     }
                 }
             }

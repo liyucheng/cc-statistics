@@ -78,17 +78,26 @@ struct ToolCall: Identifiable, Equatable {
     let timestamp: Date?
     let inputLength: Int
     let input: [String: Any]
+    let toolUseId: String?
 
-    init(name: String, timestamp: Date? = nil, inputLength: Int = 0, input: [String: Any] = [:]) {
+    init(name: String, timestamp: Date? = nil, inputLength: Int = 0, input: [String: Any] = [:], toolUseId: String? = nil) {
         self.name = name
         self.timestamp = timestamp
         self.inputLength = inputLength
         self.input = input
+        self.toolUseId = toolUseId
     }
 
     static func == (lhs: ToolCall, rhs: ToolCall) -> Bool {
         lhs.id == rhs.id
     }
+}
+
+// MARK: - Tool Result Info
+
+struct ToolResultInfo: Equatable {
+    let toolUseId: String
+    let isError: Bool
 }
 
 // MARK: - Message
@@ -100,6 +109,7 @@ struct Message: Identifiable, Equatable {
     let model: String?
     let timestamp: Date?
     let toolCalls: [ToolCall]
+    let toolResultInfos: [ToolResultInfo]
     let tokenUsage: TokenDetail?
     let isToolResult: Bool
     let isMeta: Bool
@@ -111,6 +121,7 @@ struct Message: Identifiable, Equatable {
         model: String? = nil,
         timestamp: Date? = nil,
         toolCalls: [ToolCall] = [],
+        toolResultInfos: [ToolResultInfo] = [],
         tokenUsage: TokenDetail? = nil,
         isToolResult: Bool = false,
         isMeta: Bool = false,
@@ -121,6 +132,7 @@ struct Message: Identifiable, Equatable {
         self.model = model
         self.timestamp = timestamp
         self.toolCalls = toolCalls
+        self.toolResultInfos = toolResultInfos
         self.tokenUsage = tokenUsage
         self.isToolResult = isToolResult
         self.isMeta = isMeta
@@ -191,6 +203,22 @@ struct Session: Identifiable, Equatable {
     }
 }
 
+// MARK: - Skill Usage
+
+struct SkillUsage: Equatable {
+    let name: String
+    var callCount: Int = 0
+    var successCount: Int = 0
+    var errorCount: Int = 0
+    var unknownCount: Int = 0
+
+    var successRate: Int? {
+        let resolved = successCount + errorCount
+        guard resolved > 0 else { return nil }
+        return Int(round(Double(successCount) / Double(resolved) * 100))
+    }
+}
+
 // MARK: - Code Change
 
 struct CodeChange: Identifiable, Equatable {
@@ -222,6 +250,7 @@ struct SessionStats: Equatable {
     var gitCommits: Int
     var gitAdditions: Int
     var gitDeletions: Int
+    var skillStats: [String: SkillUsage]
 
     init(
         userInstructions: Int = 0,
@@ -234,7 +263,8 @@ struct SessionStats: Equatable {
         sessionCount: Int = 0,
         gitCommits: Int = 0,
         gitAdditions: Int = 0,
-        gitDeletions: Int = 0
+        gitDeletions: Int = 0,
+        skillStats: [String: SkillUsage] = [:]
     ) {
         self.userInstructions = userInstructions
         self.toolCalls = toolCalls
@@ -247,6 +277,7 @@ struct SessionStats: Equatable {
         self.gitCommits = gitCommits
         self.gitAdditions = gitAdditions
         self.gitDeletions = gitDeletions
+        self.skillStats = skillStats
     }
 
     var totalInputTokens: Int {

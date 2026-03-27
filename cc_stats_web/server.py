@@ -299,6 +299,53 @@ def _get_daily_stats(project_dir_name=None, days=14):
     return result
 
 
+def _get_skill_stats(project_dir_name=None, since_days=None):
+    """Return skill usage statistics as a list sorted by call_count."""
+    files = _collect_session_files(project_dir_name)
+    if not files:
+        return []
+
+    files.sort(key=lambda f: f.stat().st_mtime)
+
+    since_dt = None
+    if since_days:
+        since_dt = datetime.now(tz=timezone.utc) - timedelta(days=since_days)
+
+    all_stats = []
+    for f in files:
+        try:
+            session = _parse_session_file(f)
+            stats = analyze_session(session)
+            if since_dt and stats.end_time and stats.end_time < since_dt:
+                continue
+            all_stats.append(stats)
+        except Exception:
+            continue
+
+    if not all_stats:
+        return []
+
+    result = all_stats[0] if len(all_stats) == 1 else merge_stats(all_stats)
+
+    skills = []
+    for name, su in sorted(
+        result.skill_stats.items(), key=lambda x: x[1].call_count, reverse=True
+    ):
+        resolved = su.success_count + su.error_count
+        success_rate = (
+            round(su.success_count / resolved * 100) if resolved > 0 else None
+        )
+        skills.append({
+            "name": name,
+            "call_count": su.call_count,
+            "success_count": su.success_count,
+            "error_count": su.error_count,
+            "unknown_count": su.unknown_count,
+            "success_rate": success_rate,
+        })
+    return skills
+
+
 def _get_version_update():
     """检查版本更新（供 Web API 使用）"""
     try:
@@ -340,6 +387,13 @@ class ApiHandler(SimpleHTTPRequestHandler):
             self._json(_get_daily_stats(
                 project_dir_name=project or None,
                 days=int(days),
+            ))
+        elif path == "/api/skills":
+            project = params.get("project", [None])[0]
+            days = params.get("days", [None])[0]
+            self._json(_get_skill_stats(
+                project_dir_name=project or None,
+                since_days=int(days) if days and days != "0" else None,
             ))
         elif path == "/api/version_check":
             self._json(_get_version_update())

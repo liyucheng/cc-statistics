@@ -171,8 +171,15 @@ final class SessionParser {
         // Extract model
         let model = messageObj?["model"] as? String
 
-        // Extract content and tool calls
-        let (content, toolCalls) = extractContent(from: messageObj, timestamp: timestamp)
+        // Extract content, tool calls, and tool result info
+        var (content, toolCalls, toolResultInfos) = extractContent(from: messageObj, timestamp: timestamp)
+
+        // Top-level tool_result messages carry tool_use_id and is_error directly
+        if type == "tool_result",
+           let tuId = json["tool_use_id"] as? String {
+            let isError = json["is_error"] as? Bool ?? false
+            toolResultInfos.append(ToolResultInfo(toolUseId: tuId, isError: isError))
+        }
 
         // Extract token usage
         let tokenUsage = extractTokenUsage(from: messageObj)
@@ -190,6 +197,7 @@ final class SessionParser {
             model: model,
             timestamp: timestamp,
             toolCalls: toolCalls,
+            toolResultInfos: toolResultInfos,
             tokenUsage: tokenUsage,
             isToolResult: isToolResult,
             isMeta: isMeta,
@@ -237,24 +245,25 @@ final class SessionParser {
 
     // MARK: - Content Extraction
 
-    /// Extract text content and tool calls from a message object.
+    /// Extract text content, tool calls, and tool result info from a message object.
     private func extractContent(
         from messageObj: [String: Any]?,
         timestamp: Date?
-    ) -> (String, [ToolCall]) {
-        guard let messageObj = messageObj else { return ("", []) }
+    ) -> (String, [ToolCall], [ToolResultInfo]) {
+        guard let messageObj = messageObj else { return ("", [], []) }
 
         // Content can be a string or an array of content blocks
         if let textContent = messageObj["content"] as? String {
-            return (textContent, [])
+            return (textContent, [], [])
         }
 
         guard let contentBlocks = messageObj["content"] as? [[String: Any]] else {
-            return ("", [])
+            return ("", [], [])
         }
 
         var textParts: [String] = []
         var toolCalls: [ToolCall] = []
+        var toolResultInfos: [ToolResultInfo] = []
 
         for block in contentBlocks {
             guard let blockType = block["type"] as? String else { continue }
@@ -267,6 +276,7 @@ final class SessionParser {
 
             case "tool_use":
                 let name = block["name"] as? String ?? "unknown"
+                let tuId = block["id"] as? String
                 let input = block["input"] as? [String: Any]
                 let inputLength: Int
                 if let input = input,
@@ -280,10 +290,15 @@ final class SessionParser {
                     name: name,
                     timestamp: timestamp,
                     inputLength: inputLength,
-                    input: input ?? [:]
+                    input: input ?? [:],
+                    toolUseId: tuId
                 ))
 
             case "tool_result":
+                if let tuId = block["tool_use_id"] as? String {
+                    let isError = block["is_error"] as? Bool ?? false
+                    toolResultInfos.append(ToolResultInfo(toolUseId: tuId, isError: isError))
+                }
                 if let text = block["content"] as? String {
                     textParts.append(text)
                 } else if let resultBlocks = block["content"] as? [[String: Any]] {
@@ -299,7 +314,7 @@ final class SessionParser {
             }
         }
 
-        return (textParts.joined(separator: "\n"), toolCalls)
+        return (textParts.joined(separator: "\n"), toolCalls, toolResultInfos)
     }
 
     // MARK: - Token Usage Extraction

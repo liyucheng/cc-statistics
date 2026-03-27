@@ -67,6 +67,12 @@ select:hover{border-color:var(--cyan)}
 .model-tokens{font-size:10px;color:var(--text3);font-family:monospace}
 .stacked-bar{height:8px;border-radius:4px;display:flex;overflow:hidden;margin-top:4px}
 .stacked-seg{height:100%;transition:width .5s ease}
+.skill-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.skill-name{font-size:11px;color:var(--text2);width:90px;text-align:right;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.skill-bar{flex:1;height:16px;background:rgba(255,255,255,.03);border-radius:3px;overflow:hidden}
+.skill-bar-fill{height:100%;border-radius:3px;transition:width .5s ease}
+.skill-count{font-size:11px;color:var(--text3);width:28px;text-align:right}
+.skill-rate{font-size:10px;font-weight:600;width:40px;text-align:right}
 .info{font-size:11px;color:var(--text3);text-align:center;padding-top:10px}
 .empty{text-align:center;padding:60px 20px;color:var(--text3)}
 .loading{display:flex;align-items:center;justify-content:center;padding:40px;color:var(--text3);font-size:13px}
@@ -115,6 +121,7 @@ select:hover{border-color:var(--cyan)}
     <div class="card"><div class="card-title">Token Usage</div><div id="token-section"></div></div>
     <div class="card"><div class="card-title">Tool Calls</div><div id="tools-section"></div></div>
   </div>
+  <div class="card" id="skill-card" style="display:none;margin-bottom:16px"><div class="card-title">Skill Usage</div><div id="skill-section"></div></div>
   <div class="info" id="info"></div>
 </div>
 <script>
@@ -148,9 +155,10 @@ function renderProjectSelect(){
 
 async function loadStats(){
   const days=currentDays>0?currentDays:null;
-  const [stats,daily]=await Promise.all([
+  const [stats,daily,skills]=await Promise.all([
     api('/api/stats',{project:currentProject||null,days}),
     api('/api/daily_stats',{project:currentProject||null,days:currentDays>0?currentDays:30}),
+    api('/api/skills',{project:currentProject||null,days}),
   ]);
   if(stats.error){document.getElementById('info').textContent=stats.error;return;}
   updateMetrics(stats);
@@ -159,6 +167,7 @@ async function loadStats(){
   updateCode(stats);
   updateTokens(stats);
   updateTools(stats);
+  updateSkills(skills);
   const info=document.getElementById('info');
   info.textContent=stats.session_count+' sessions analyzed';
 }
@@ -226,6 +235,20 @@ function updateTools(d){
   const items=d.tool_calls.slice(0,10);
   const max=items[0]?.count||1;
   el.innerHTML=items.map((t,i)=>'<div class="bar-row"><div class="bar-label">'+t.name+'</div><div class="bar-track"><div class="bar-fill" style="width:'+Math.round(t.count/max*100)+'%;background:'+COLORS[i%8]+'80"></div></div><div class="bar-count">'+t.count+'</div></div>').join('');
+}
+
+function updateSkills(skills){
+  const card=document.getElementById('skill-card');
+  const el=document.getElementById('skill-section');
+  if(!skills||!skills.length){card.style.display='none';return;}
+  card.style.display='';
+  const max=skills[0].call_count||1;
+  el.innerHTML=skills.slice(0,10).map((s,i)=>{
+    const pct=Math.round(s.call_count/max*100);
+    const rateColor=s.success_rate==null?'var(--text3)':s.success_rate>=90?'var(--green)':s.success_rate>=70?'var(--amber)':'var(--red)';
+    const rateText=s.success_rate!=null?s.success_rate+'%':'—';
+    return '<div class="skill-row"><div class="skill-name" title="'+s.name+'">'+s.name+'</div><div class="skill-bar"><div class="skill-bar-fill" style="width:'+pct+'%;background:'+COLORS[i%8]+'80"></div></div><div class="skill-count">'+s.call_count+'</div><div class="skill-rate" style="color:'+rateColor+'">'+rateText+'</div></div>';
+  }).join('');
 }
 
 document.getElementById('project-select').addEventListener('change',e=>{currentProject=e.target.value;loadStats()});

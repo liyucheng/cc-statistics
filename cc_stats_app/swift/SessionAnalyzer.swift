@@ -67,6 +67,7 @@ class SessionAnalyzer {
         var mergedToolCalls: [String: Int] = [:]
         var mergedTokenUsage: [String: TokenDetail] = [:]
         var mergedCodeChanges: [CodeChange] = []
+        var mergedSkillStats: [String: SkillUsage] = [:]
         var totalUserInstructions = 0
         var totalDuration: TimeInterval = 0
         var totalAIProcessingTime: TimeInterval = 0
@@ -95,6 +96,16 @@ class SessionAnalyzer {
             }
 
             mergedCodeChanges.append(contentsOf: s.codeChanges)
+
+            for (name, su) in s.skillStats {
+                if mergedSkillStats[name] == nil {
+                    mergedSkillStats[name] = SkillUsage(name: name)
+                }
+                mergedSkillStats[name]!.callCount += su.callCount
+                mergedSkillStats[name]!.successCount += su.successCount
+                mergedSkillStats[name]!.errorCount += su.errorCount
+                mergedSkillStats[name]!.unknownCount += su.unknownCount
+            }
         }
 
         return SessionStats(
@@ -108,7 +119,8 @@ class SessionAnalyzer {
             sessionCount: totalSessionCount,
             gitCommits: totalGitCommits,
             gitAdditions: totalGitAdditions,
-            gitDeletions: totalGitDeletions
+            gitDeletions: totalGitDeletions,
+            skillStats: mergedSkillStats
         )
     }
 
@@ -130,6 +142,7 @@ class SessionAnalyzer {
         let duration = calculateDuration(messages)
         let codeChanges = collectCodeChanges(messages)
         let tokenUsage = aggregateTokenUsage(messages)
+        let skillStats = collectSkillStats(messages)
 
         return SessionStats(
             userInstructions: userInstructions,
@@ -142,7 +155,8 @@ class SessionAnalyzer {
             sessionCount: 1,
             gitCommits: 0,
             gitAdditions: 0,
-            gitDeletions: 0
+            gitDeletions: 0,
+            skillStats: skillStats
         )
     }
 
@@ -177,6 +191,43 @@ class SessionAnalyzer {
             }
         }
         return counts
+    }
+
+    // MARK: - Skill Stats
+
+    private static func collectSkillStats(_ messages: [Message]) -> [String: SkillUsage] {
+        // Build tool_use_id → is_error mapping from tool results
+        var toolResultErrors: [String: Bool] = [:]
+        for msg in messages {
+            for info in msg.toolResultInfos {
+                toolResultErrors[info.toolUseId] = info.isError
+            }
+        }
+
+        // Collect Skill tool calls and match with results
+        var stats: [String: SkillUsage] = [:]
+        for msg in messages where msg.role == "assistant" {
+            for call in msg.toolCalls where call.name == "Skill" {
+                let skillName = call.input["skill"] as? String ?? ""
+                guard !skillName.isEmpty else { continue }
+
+                if stats[skillName] == nil {
+                    stats[skillName] = SkillUsage(name: skillName)
+                }
+                stats[skillName]!.callCount += 1
+
+                if let tuId = call.toolUseId, let isError = toolResultErrors[tuId] {
+                    if isError {
+                        stats[skillName]!.errorCount += 1
+                    } else {
+                        stats[skillName]!.successCount += 1
+                    }
+                } else {
+                    stats[skillName]!.unknownCount += 1
+                }
+            }
+        }
+        return stats
     }
 
     // MARK: - Duration Calculation
