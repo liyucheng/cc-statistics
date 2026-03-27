@@ -216,4 +216,13 @@ enum L10n {
     static var hooksNotInstalled: String { isChinese ? "未安装" : "Not Installed" }
     static var testNotification: String { isChinese ? "测试通知" : "Test" }
     static var notifySent: String { isChinese ? "已发送" : "Sent" }
+
+    // MARK: - Dashboard Modules
+    static var dashboardModules: String { isChinese ? "面板模块" : "Dashboard Modules" }
+    static var dashboardModulesDesc: String { isChinese ? "选择要在面板上显示的模块" : "Choose which modules to show on dashboard" }
+    static var coreModules: String { isChinese ? "核心模块（始终显示）" : "Core modules (always shown)" }
+    static var optionalModules: String { isChinese ? "可选模块" : "Optional modules" }
+    static var headerCardsLabel: String { isChinese ? "概览卡片" : "Header Cards" }
+    static var tokenUsageLabel: String { isChinese ? "Token 统计" : "Token Usage" }
+    static var trendChartLabel: String { isChinese ? "每日趋势图" : "Daily Trend" }
 }

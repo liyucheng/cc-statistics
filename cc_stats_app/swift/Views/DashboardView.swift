@@ -11,6 +11,7 @@ struct DashboardView: View {
     @State private var trendMetric: TrendMetric = .cost
     @State private var activeGuide: String?
     @State private var guideAnchors: [String: Anchor<CGRect>] = [:]
+    @State private var moduleVersion: Int = 0
 
     enum TrendMetric: String, CaseIterable {
         case cost, tokens, sessions, activeTime
@@ -65,7 +66,8 @@ struct DashboardView: View {
                 SettingsView(
                     isPresented: $viewModel.showSettings,
                     onLanguageChanged: { viewModel.languageVersion += 1 },
-                    onThemeChanged: { viewModel.themeMode = $0 }
+                    onThemeChanged: { viewModel.themeMode = $0 },
+                    onModulesChanged: { moduleVersion += 1 }
                 )
             } else {
                 VStack(spacing: 0) {
@@ -97,7 +99,7 @@ struct DashboardView: View {
                     // Bottom bar
                     footerSection
                 }
-                .id(viewModel.languageVersion)
+                .id("\(viewModel.languageVersion)-\(moduleVersion)")
             }
         }
 
@@ -257,17 +259,36 @@ struct DashboardView: View {
             } else if let stats = viewModel.stats {
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 14) {
+                        // Core modules (always shown)
                         headerCards(stats: stats)
-                        rateLimitSection
-                        trendChart
-                        developmentTimeSection(stats: stats)
-                        codeChangesSection(stats: stats)
                         tokenUsageSection(stats: stats)
-                        toolCallsSection(stats: stats)
-                        skillStatsSection(stats: stats)
-                        efficiencySection(stats: stats)
-                        costPredictionSection(stats: stats)
-                        processSection
+                        trendChart
+
+                        // Optional modules (controlled by settings)
+                        if DashboardModule.rateLimit.isVisible {
+                            rateLimitSection
+                        }
+                        if DashboardModule.developmentTime.isVisible {
+                            developmentTimeSection(stats: stats)
+                        }
+                        if DashboardModule.codeChanges.isVisible {
+                            codeChangesSection(stats: stats)
+                        }
+                        if DashboardModule.toolCalls.isVisible {
+                            toolCallsSection(stats: stats)
+                        }
+                        if DashboardModule.skillStats.isVisible {
+                            skillStatsSection(stats: stats)
+                        }
+                        if DashboardModule.efficiency.isVisible {
+                            efficiencySection(stats: stats)
+                        }
+                        if DashboardModule.costPrediction.isVisible {
+                            costPredictionSection(stats: stats)
+                        }
+                        if DashboardModule.processMonitor.isVisible {
+                            processSection
+                        }
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 8)

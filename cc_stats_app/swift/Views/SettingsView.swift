@@ -7,6 +7,7 @@ struct SettingsView: View {
     @Binding var isPresented: Bool
     var onLanguageChanged: (() -> Void)?
     var onThemeChanged: ((String) -> Void)?
+    var onModulesChanged: (() -> Void)?
     @State private var launchAtLogin: Bool = false
     @State private var language: String = "auto"
     @State private var theme: String = "auto"
@@ -90,6 +91,55 @@ struct SettingsView: View {
                                 ("light", L10n.themeLight),
                             ]
                         )
+                    }
+
+                    // Dashboard Modules section
+                    settingsSection(title: L10n.dashboardModules, icon: "square.grid.2x2.fill") {
+                        // Core modules (always visible, not toggleable)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(L10n.coreModules)
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(Theme.textTertiary)
+                                .padding(.bottom, 2)
+
+                            ForEach(
+                                [
+                                    ("chart.bar.fill", L10n.headerCardsLabel),
+                                    ("circle.hexagonpath.fill", L10n.tokenUsageLabel),
+                                    ("chart.xyaxis.line", L10n.trendChartLabel),
+                                ],
+                                id: \.1
+                            ) { icon, label in
+                                HStack(spacing: 8) {
+                                    Image(systemName: icon)
+                                        .font(.system(size: 11))
+                                        .foregroundColor(Theme.cyan)
+                                        .frame(width: 20)
+                                    Text(label)
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(Theme.textSecondary)
+                                    Spacer()
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(Theme.green.opacity(0.6))
+                                }
+                                .frame(height: 24)
+                            }
+                        }
+
+                        Divider().background(Theme.border)
+
+                        // Optional modules (toggleable)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(L10n.optionalModules)
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(Theme.textTertiary)
+                                .padding(.bottom, 2)
+
+                            ForEach(DashboardModule.allCases) { module in
+                                moduleToggleRow(module: module)
+                            }
+                        }
                     }
 
                     // Alerts section
@@ -427,6 +477,31 @@ struct SettingsView: View {
                 .toggleStyle(.switch)
                 .scaleEffect(0.7)
         }
+    }
+
+    // MARK: - Module Toggle Row
+
+    private func moduleToggleRow(module: DashboardModule) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: module.icon)
+                .font(.system(size: 11))
+                .foregroundColor(Theme.purple)
+                .frame(width: 20)
+            Text(module.label)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(Theme.textPrimary)
+            Spacer()
+            Toggle("", isOn: Binding(
+                get: { module.isVisible },
+                set: { newValue in
+                    module.isVisible = newValue
+                    onModulesChanged?()
+                }
+            ))
+            .toggleStyle(.switch)
+            .scaleEffect(0.7)
+        }
+        .frame(height: 26)
     }
 
     // MARK: - Picker Row

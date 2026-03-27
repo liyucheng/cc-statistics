@@ -540,3 +540,88 @@ struct ProjectInfo: Identifiable, Hashable {
         lhs.path == rhs.path
     }
 }
+
+// MARK: - Dashboard Module Settings
+
+enum DashboardModule: String, CaseIterable, Identifiable {
+    case rateLimit
+    case developmentTime
+    case codeChanges
+    case toolCalls
+    case skillStats
+    case efficiency
+    case costPrediction
+    case processMonitor
+
+    var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .rateLimit: return "gauge.with.dots.needle.50percent"
+        case .developmentTime: return "chart.pie.fill"
+        case .codeChanges: return "chevron.left.forwardslash.chevron.right"
+        case .toolCalls: return "hammer.fill"
+        case .skillStats: return "command.circle.fill"
+        case .efficiency: return "gauge.with.dots.needle.33percent"
+        case .costPrediction: return "chart.line.uptrend.xyaxis"
+        case .processMonitor: return "memorychip"
+        }
+    }
+
+    var labelChinese: String {
+        switch self {
+        case .rateLimit: return "速率限制"
+        case .developmentTime: return "开发时间分析"
+        case .codeChanges: return "代码变更"
+        case .toolCalls: return "工具调用排行"
+        case .skillStats: return "Skill 使用"
+        case .efficiency: return "效率评分"
+        case .costPrediction: return "费用预测"
+        case .processMonitor: return "进程监控"
+        }
+    }
+
+    var labelEnglish: String {
+        switch self {
+        case .rateLimit: return "Rate Limit"
+        case .developmentTime: return "Development Time"
+        case .codeChanges: return "Code Changes"
+        case .toolCalls: return "Tool Calls"
+        case .skillStats: return "Skill Usage"
+        case .efficiency: return "Efficiency"
+        case .costPrediction: return "Cost Prediction"
+        case .processMonitor: return "Process Monitor"
+        }
+    }
+
+    var label: String {
+        L10n.isChinese ? labelChinese : labelEnglish
+    }
+
+    /// Default visibility — core modules are on by default
+    var defaultVisible: Bool {
+        switch self {
+        case .costPrediction: return true
+        default: return false
+        }
+    }
+
+    // MARK: - UserDefaults persistence
+
+    private var defaultsKey: String {
+        "cc_stats_module_\(rawValue)"
+    }
+
+    var isVisible: Bool {
+        get {
+            let key = defaultsKey
+            if UserDefaults.standard.object(forKey: key) == nil {
+                return defaultVisible
+            }
+            return UserDefaults.standard.bool(forKey: key)
+        }
+        nonmutating set {
+            UserDefaults.standard.set(newValue, forKey: defaultsKey)
+        }
+    }
+}
