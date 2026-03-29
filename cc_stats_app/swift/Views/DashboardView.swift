@@ -162,20 +162,12 @@ struct DashboardView: View {
         .frame(width: 480)
         .frame(maxHeight: 640)
         .background(Theme.background)
-        .preferredColorScheme(resolvedColorScheme)
         .animation(.easeInOut(duration: 0.15), value: viewModel.isLoading)
         .onPreferenceChange(GuideAnchorKey.self) { guideAnchors = $0 }
         .onAppear { triggerGuideIfNeeded() }
         .onChange(of: viewModel.stats != nil) { _ in triggerGuideIfNeeded() }
     }
 
-    private var resolvedColorScheme: ColorScheme? {
-        switch viewModel.themeMode {
-        case "dark": return .dark
-        case "light": return .light
-        default: return nil  // follow system
-        }
-    }
 
     // MARK: - Guide
 

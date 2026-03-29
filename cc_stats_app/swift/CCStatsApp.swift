@@ -189,6 +189,29 @@ class StatusBarController {
     private var renderedOverLimit: Bool = false
 
     private let logoImage: NSImage
+    private var currentIcon: NSImage?
+
+    // MARK: - Animation State
+
+    private var animationTimer: Timer?
+    private var animationFrameIndex: Int = 0
+    private(set) var activityState: SessionActivityState = .idle
+
+    /// Clawd mascot image names for each animation frame per state.
+    static let animationFrames: [SessionActivityState: [String]] = [
+        .idle: ["clawd-idle-f0", "clawd-idle-f1", "clawd-sleeping-f0", "clawd-sleeping-f1", "clawd-sleeping-f2"],
+        .active: ["clawd-typing-f0", "clawd-typing-f1", "clawd-typing-f2"],
+        .thinking: ["clawd-thinking-f0", "clawd-thinking-f1"],
+        .error: ["clawd-error-f0"],
+    ]
+
+    /// Frame interval per state (seconds).
+    static let frameIntervals: [SessionActivityState: TimeInterval] = [
+        .idle: 0.6,
+        .active: 0.15,
+        .thinking: 0.5,
+        .error: 0,        // static
+    ]
 
     init(onToggle: @escaping () -> Void, onToggleChat: @escaping () -> Void) {
         self.onToggle = onToggle
@@ -196,13 +219,18 @@ class StatusBarController {
         self.logoImage = drawClaudeLogo(size: NSSize(width: 18, height: 18))
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
+        // Load initial Clawd icon (colorful, not template)
+        let initialIcon = Self.loadClawdImage(frameName: "clawd-idle-f0") ?? logoImage
+        initialIcon.isTemplate = false
+        self.currentIcon = initialIcon
+        print("[CCStats] init: initialIcon loaded=\(currentIcon != nil), isTemplate=\(currentIcon?.isTemplate ?? false)")
+
         if let button = statusItem.button {
             button.action = #selector(handleClick(_:))
             button.target = self
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
-            button.imagePosition = .imageLeading
-            button.image = logoImage
-            button.image?.isTemplate = true
+            button.imagePosition = .imageOnly
+            button.image = initialIcon
         }
     }
 
@@ -318,49 +346,109 @@ class StatusBarController {
         renderedLine2 = line2
         renderedOverLimit = isOverLimit
 
+        let icon = currentIcon ?? logoImage
+
         // 无数据时仅显示图标
         if line1.isEmpty && line2.isEmpty {
-            button.image = logoImage
-            button.image?.isTemplate = true
-            button.attributedTitle = NSAttributedString()
+            button.image = icon
+            button.title = ""
+            button.imagePosition = .imageOnly
             statusItem.length = NSStatusItem.variableLength
             return
         }
 
-        // 用 attributedTitle 展示文字（避免子视图 + Auto Layout 导致 replicant 死循环）
-        button.image = logoImage
-        button.image?.isTemplate = true
-        button.imagePosition = .imageLeading
-
+        // 合成图标+文字为单张 NSImage
         let textColor: NSColor = isOverLimit ? .systemRed : .headerTextColor
+        let compositeImage = renderStatusBarImage(icon: icon, line1: line1, line2: line2, textColor: textColor)
+        button.image = compositeImage
+        button.title = ""
+        button.imagePosition = .imageOnly
+        statusItem.length = NSStatusItem.variableLength
+    }
+
+    private func renderStatusBarImage(icon: NSImage, line1: String, line2: String, textColor: NSColor) -> NSImage {
+        let barHeight: CGFloat = 22
+        let leftMargin: CGFloat = 2
+        let iconTextGap: CGFloat = 4
+        let rightMargin: CGFloat = 4
         let font = NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium)
 
+        let iconW = icon.size.width
+        let iconH = icon.size.height
+
+        // Measure text
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: textColor,
+        ]
+        let line1Size = (line1 as NSString).size(withAttributes: attrs)
+        let line2Size = line2.isEmpty ? NSSize.zero : (line2 as NSString).size(withAttributes: attrs)
+        let textWidth = max(line1Size.width, line2Size.width)
+
+        let totalWidth = leftMargin + iconW + iconTextGap + textWidth + rightMargin
+        let logicalSize = NSSize(width: totalWidth, height: barHeight)
+
+        // Use backing scale factor for Retina-aware rendering
+        let scale = NSScreen.main?.backingScaleFactor ?? 2.0
+        let pixelW = Int(totalWidth * scale)
+        let pixelH = Int(barHeight * scale)
+
+        guard let bitmapRep = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: pixelW,
+            pixelsHigh: pixelH,
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bytesPerRow: 0,
+            bitsPerPixel: 0
+        ) else {
+            // Fallback: return icon as-is
+            return icon
+        }
+        bitmapRep.size = logicalSize
+
+        NSGraphicsContext.saveGraphicsState()
+        let context = NSGraphicsContext(bitmapImageRep: bitmapRep)
+        NSGraphicsContext.current = context
+
+        // Standard macOS coordinates: y=0 at bottom, no transforms needed
+
+        // Draw icon vertically centered
+        let iconY = (barHeight - iconH) / 2
+        icon.draw(in: NSRect(x: leftMargin, y: iconY, width: iconW, height: iconH),
+                  from: .zero, operation: .sourceOver, fraction: 1.0)
+
+        // Right-align text
+        let rightEdge = totalWidth - rightMargin
+        let lineSpacing: CGFloat = 1
+
         if line2.isEmpty {
-            let paraStyle = NSMutableParagraphStyle()
-            paraStyle.alignment = .center
-            let attrs: [NSAttributedString.Key: Any] = [
-                .font: font,
-                .foregroundColor: textColor,
-                .paragraphStyle: paraStyle,
-                .baselineOffset: -2.0,
-            ]
-            button.attributedTitle = NSAttributedString(string: line1, attributes: attrs)
+            // Single line: vertically centered
+            let x1 = rightEdge - line1Size.width
+            let textY = (barHeight - line1Size.height) / 2
+            (line1 as NSString).draw(at: NSPoint(x: x1, y: textY), withAttributes: attrs)
         } else {
-            let paraStyle = NSMutableParagraphStyle()
-            paraStyle.alignment = .center
-            paraStyle.lineSpacing = 0
-            paraStyle.maximumLineHeight = 11
-            paraStyle.minimumLineHeight = 11
-            let attrs: [NSAttributedString.Key: Any] = [
-                .font: font,
-                .foregroundColor: textColor,
-                .paragraphStyle: paraStyle,
-                .baselineOffset: -2.0,
-            ]
-            button.attributedTitle = NSAttributedString(string: "\(line1)\n\(line2)", attributes: attrs)
+            // Two lines: vertically centered as a block
+            let line1H = line1Size.height
+            let line2H = line2Size.height
+            let totalTextH = line1H + lineSpacing + line2H
+            let baseY = (barHeight - totalTextH) / 2
+            let x1 = rightEdge - line1Size.width
+            let x2 = rightEdge - line2Size.width
+            // y=0 at bottom: line2 at baseY (bottom), line1 above it
+            (line2 as NSString).draw(at: NSPoint(x: x2, y: baseY), withAttributes: attrs)
+            (line1 as NSString).draw(at: NSPoint(x: x1, y: baseY + line2H + lineSpacing), withAttributes: attrs)
         }
 
-        statusItem.length = NSStatusItem.variableLength
+        NSGraphicsContext.restoreGraphicsState()
+
+        let image = NSImage(size: logicalSize)
+        image.addRepresentation(bitmapRep)
+        image.isTemplate = false
+        return image
     }
 
     private static func formatTokens(_ n: Int) -> String {
@@ -368,6 +456,166 @@ class StatusBarController {
         if n >= 1_000_000 { return String(format: "%.1fM", Double(n) / 1e6) }
         if n >= 1_000 { return String(format: "%.1fK", Double(n) / 1e3) }
         return "\(n)"
+    }
+
+    // MARK: - Clawd Image Loading
+
+    /// Fixed icon canvas size — all frames are scaled to fit within this box
+    /// and drawn centered to prevent status bar jitter during animation.
+    static let iconCanvasSize = NSSize(width: 30, height: 18)
+
+    /// Load a Clawd mascot image by frame name.
+    /// Search order: bundle Resources/clawd/ → dev source directory → nil.
+    /// All images are normalized to a fixed canvas size to prevent layout jitter.
+    static func loadClawdImage(frameName: String) -> NSImage? {
+        var rawImage: NSImage?
+
+        // Try loading from bundle Resources/clawd/
+        let resourcesDir = Bundle.main.bundleURL
+            .appendingPathComponent("Contents/Resources/clawd")
+            .path
+        let imagePath2x = "\(resourcesDir)/\(frameName)@2x.png"
+        let imagePath1x = "\(resourcesDir)/\(frameName).png"
+
+        if FileManager.default.fileExists(atPath: imagePath2x) {
+            rawImage = NSImage(contentsOfFile: imagePath2x)
+        } else if FileManager.default.fileExists(atPath: imagePath1x) {
+            rawImage = NSImage(contentsOfFile: imagePath1x)
+        }
+
+        // Fallback: load from source directory (development mode)
+        if rawImage == nil {
+            let swiftDir = URL(fileURLWithPath: #file).deletingLastPathComponent().path
+            let devPath2x = "\(swiftDir)/Resources/clawd/\(frameName)@2x.png"
+            let devPath1x = "\(swiftDir)/Resources/clawd/\(frameName).png"
+            if FileManager.default.fileExists(atPath: devPath2x) {
+                rawImage = NSImage(contentsOfFile: devPath2x)
+            } else if FileManager.default.fileExists(atPath: devPath1x) {
+                rawImage = NSImage(contentsOfFile: devPath1x)
+            }
+        }
+
+        guard let raw = rawImage else { return nil }
+
+        // Scale to fit within canvas, preserving aspect ratio
+        let rawRatio = raw.size.width / raw.size.height
+        let canvasRatio = iconCanvasSize.width / iconCanvasSize.height
+        let scaledW: CGFloat
+        let scaledH: CGFloat
+        if rawRatio > canvasRatio {
+            // Wider than canvas — fit by width
+            scaledW = iconCanvasSize.width
+            scaledH = scaledW / rawRatio
+        } else {
+            // Taller or same — fit by height
+            scaledH = iconCanvasSize.height
+            scaledW = scaledH * rawRatio
+        }
+
+        // Draw centered on fixed-size canvas to prevent jitter
+        let canvas = NSImage(size: iconCanvasSize, flipped: false) { rect in
+            let x = (rect.width - scaledW) / 2
+            let y = (rect.height - scaledH) / 2
+            raw.draw(in: NSRect(x: x, y: y, width: scaledW, height: scaledH),
+                     from: .zero, operation: .sourceOver, fraction: 1.0)
+            return true
+        }
+        canvas.isTemplate = false
+        return canvas
+    }
+
+    // MARK: - Activity State Animation
+
+    func updateActivityState(_ state: SessionActivityState) {
+        print("[CCStats] updateActivityState called: \(state)")
+        guard state != activityState else { return }
+        activityState = state
+        animationFrameIndex = 0
+        stopAnimation()
+
+        applyActivityIcon()
+
+        let interval = Self.frameIntervals[state] ?? 0
+        let frames = Self.animationFrames[state] ?? []
+        guard interval > 0, frames.count > 1 else { return }
+
+        animationTimer = Timer.scheduledTimer(
+            withTimeInterval: interval,
+            repeats: true
+        ) { [weak self] _ in
+            self?.advanceAnimationFrame()
+        }
+    }
+
+    func stopAnimation() {
+        animationTimer?.invalidate()
+        animationTimer = nil
+    }
+
+    private func advanceAnimationFrame() {
+        guard let frames = Self.animationFrames[activityState], frames.count > 1 else {
+            stopAnimation()
+            return
+        }
+        animationFrameIndex = (animationFrameIndex + 1) % frames.count
+        applyActivityIcon()
+    }
+
+    private func applyActivityIcon() {
+        guard let button = statusItem.button else { return }
+        let frames = Self.animationFrames[activityState] ?? ["clawd-idle-f0"]
+        let frameName = frames[animationFrameIndex % frames.count]
+
+        var image: NSImage?
+        var loadSource = "none"
+
+        // Use shared loading logic (bundle → dev directory)
+        if let loaded = Self.loadClawdImage(frameName: frameName) {
+            image = loaded
+            loadSource = "clawd"
+        }
+
+        // Final fallback: SF Symbol
+        if image == nil {
+            let fallbackSymbols: [SessionActivityState: String] = [
+                .idle: "sparkles",
+                .active: "sparkle",
+                .thinking: "arrow.trianglehead.2.clockwise",
+                .error: "exclamationmark.triangle.fill",
+            ]
+            let symbolName = fallbackSymbols[activityState] ?? "sparkles"
+            let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .regular)
+            image = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)?
+                .withSymbolConfiguration(config)
+            loadSource = "sf-symbol(\(symbolName))"
+        }
+
+        print("[CCStats] applyActivityIcon: state=\(activityState) frame=\(frameName) source=\(loadSource) imageNil=\(image == nil)")
+
+        // Clawd is colorful pixel art — never use template mode
+        image?.isTemplate = false
+
+        if activityState == .error {
+            button.contentTintColor = .systemRed
+        } else {
+            button.contentTintColor = nil
+        }
+
+        // Store icon for refreshLabel to use later
+        currentIcon = image
+
+        // Directly update button image — bypasses refreshLabel dedup guard
+        // so icon changes always take effect even when text hasn't changed.
+        let icon = currentIcon ?? logoImage
+        if renderedLine1.isEmpty && renderedLine2.isEmpty {
+            button.image = icon
+            button.imagePosition = .imageOnly
+        } else {
+            let textColor: NSColor = isOverLimit ? .systemRed : .headerTextColor
+            let compositeImage = renderStatusBarImage(icon: icon, line1: renderedLine1, line2: renderedLine2, textColor: textColor)
+            button.image = compositeImage
+            button.imagePosition = .imageOnly
+        }
     }
 }
 
@@ -383,6 +631,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var hotkeyManager: HotkeyManager?
     var eventMonitor: Any?
     private let notificationServer = NotificationServer()
+    private let activityMonitor = SessionActivityMonitor()
     private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -394,9 +643,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         setupStatusBar()
         setupGlobalHotkey()
+        setupActivityMonitor()
         observeConversationPanel()
         observeTokenUsage()
         observeTheme()
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        activityMonitor.stop()
+        statusBarController?.stopAnimation()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -415,6 +670,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.viewModel.toggleConversationPanel()
             }
         )
+    }
+
+    // MARK: - Activity Monitor
+
+    private func setupActivityMonitor() {
+        print("[CCStats] setupActivityMonitor called")
+        activityMonitor.onStateChange = { [weak self] state in
+            print("[CCStats] onStateChange: \(state)")
+            DispatchQueue.main.async {
+                self?.statusBarController?.updateActivityState(state)
+            }
+        }
+        activityMonitor.start()
     }
 
     // MARK: - Global Hotkey (Cmd+Shift+C)
@@ -540,6 +808,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func applyThemeToPanel(_ panel: NSPanel) {
         let theme = viewModel.themeMode
+        print("[CCStats] applyThemeToPanel: theme=\(theme)")
         switch theme {
         case "dark":
             panel.appearance = NSAppearance(named: .darkAqua)
@@ -555,6 +824,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] theme in
                 guard let self = self else { return }
+                print("[CCStats] observeTheme sink: theme=\(theme), mainWindow=\(self.mainWindow != nil)")
+
+                // 设置 NSApp.appearance（影响全局 + 所有未显式设置 appearance 的 window）
+                switch theme {
+                case "dark":
+                    NSApp.appearance = NSAppearance(named: .darkAqua)
+                case "light":
+                    NSApp.appearance = NSAppearance(named: .aqua)
+                default:  // "auto" — 跟随系统
+                    NSApp.appearance = nil
+                }
+
+                // 同时更新各个 panel
                 if let window = self.mainWindow as? NSPanel {
                     self.applyThemeToPanel(window)
                 }

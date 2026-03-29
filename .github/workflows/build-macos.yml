@@ -45,6 +45,7 @@ jobs:
           APP="CCStats.app"
           mkdir -p "$APP/Contents/MacOS"
           mkdir -p "$APP/Contents/Resources"
+          cp -R cc_stats_app/swift/Resources/clawd "$APP/Contents/Resources/clawd" 2>/dev/null || true
           cp Info.plist.tmp "$APP/Contents/Info.plist"
           mv CCStats "$APP/Contents/MacOS/CCStats"
           chmod +x "$APP/Contents/MacOS/CCStats"

@@ -199,3 +199,7 @@ cc-stats-app
 | Codex | `~/.codex/sessions/*.jsonl` |
 | Cursor | `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb` |
 | Git 变更 | 项目目录的 `git log --numstat` |
+
+## 致谢
+
+- 状态栏 Clawd 动画素材来自 [clawd-on-desk](https://github.com/rullerzhou-afk/clawd-on-desk) — 一个 Electron 桌面宠物应用，通过 hook 系统实时感知 AI coding agent 的工作状态并播放像素风动画。

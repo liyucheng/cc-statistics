@@ -193,6 +193,12 @@ def _create_app_bundle(binary_path: str, version: str):
     shutil.move(binary_path, dest_bin)
     os.chmod(dest_bin, 0o755)
 
+    # 复制 clawd 图标资源
+    src_clawd = os.path.join(_swift_dir, "Resources", "clawd")
+    if os.path.isdir(src_clawd):
+        dest_clawd = os.path.join(resources_dir, "clawd")
+        shutil.copytree(src_clawd, dest_clawd)
+
     # 生成 Info.plist（从模板替换版本号）
     with open(_info_plist_template) as f:
         plist_content = f.read()

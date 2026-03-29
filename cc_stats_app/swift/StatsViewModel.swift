@@ -74,6 +74,7 @@ final class StatsViewModel: ObservableObject {
     struct FilterResult {
         let stats: SessionStats
         let recentSessions: [Session]
+        let filteredSessions: [Session]
         let todayTokens: Int
         let todayCost: Double
         let todaySessions: Int
@@ -104,6 +105,8 @@ final class StatsViewModel: ObservableObject {
     private var cachedProjects: [ProjectInfo] = []
     private var cachedSource: DataSource?
     private var cachedProject: ProjectInfo?
+    /// Sessions currently contributing to `stats` (after time filter).
+    private var currentFilteredSessions: [Session] = []
 
     // MARK: - Version Update
     @Published var updateAvailable: String?  // 新版本号（nil = 无更新）
@@ -287,6 +290,7 @@ final class StatsViewModel: ObservableObject {
             return FilterResult(
                 stats: stats,
                 recentSessions: recent,
+                filteredSessions: filteredSessions,
                 todayTokens: todayPoint?.tokens ?? 0,
                 todayCost: todayPoint?.cost ?? 0,
                 todaySessions: todayPoint?.sessions ?? 0,
@@ -315,7 +319,11 @@ final class StatsViewModel: ObservableObject {
             self.cursorStats = nil
         }
 
+        self.currentFilteredSessions = result.filteredSessions
         self.lastRefreshed = Date()
+
+        // 懒加载 git stats（后台异步，不阻塞 UI）
+        triggerGitStatsCollection(for: result.filteredSessions)
 
         // 获取速率限制（如果配置了 token）
         fetchRateLimit()
@@ -425,6 +433,58 @@ final class StatsViewModel: ObservableObject {
         cachedProjects = []
         cachedSource = nil
         cachedProject = nil
+        GitStatsCollector.shared.clearCache()
+    }
+
+    // MARK: - Git Stats Lazy Loading
+
+    /// Trigger background git stats collection for sessions with a project path.
+    /// When each session's git stats arrive, merge them into the published `stats`.
+    private func triggerGitStatsCollection(for sessions: [Session]) {
+        let sessionsWithProject = sessions.filter { $0.projectPath != nil }
+        guard !sessionsWithProject.isEmpty else { return }
+
+        for session in sessionsWithProject {
+            GitStatsCollector.shared.collect(for: session) { [weak self] _, result in
+                guard let self, result != .zero else { return }
+                self.mergeGitStats()
+            }
+        }
+    }
+
+    /// Re-merge git stats from cache into the current stats snapshot.
+    private func mergeGitStats() {
+        guard let current = self.stats else { return }
+        var commits = 0
+        var additions = 0
+        var deletions = 0
+
+        for session in currentFilteredSessions {
+            if let cached = GitStatsCollector.shared.cached(for: session) {
+                commits += cached.commits
+                additions += cached.additions
+                deletions += cached.deletions
+            }
+        }
+
+        let updated = SessionStats(
+            userInstructions: current.userInstructions,
+            toolCalls: current.toolCalls,
+            totalDuration: current.totalDuration,
+            aiProcessingTime: current.aiProcessingTime,
+            userActiveTime: current.userActiveTime,
+            codeChanges: current.codeChanges,
+            tokenUsage: current.tokenUsage,
+            sessionCount: current.sessionCount,
+            gitCommits: commits,
+            gitAdditions: additions,
+            gitDeletions: deletions,
+            skillStats: current.skillStats
+        )
+
+        if self.stats != updated {
+            self.stats = updated
+        }
     }
 
     private func fetchRateLimit() {

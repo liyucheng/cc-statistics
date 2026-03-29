@@ -152,6 +152,10 @@ All data is read from local `~/.claude/` files. Nothing is sent over the network
 | Token usage | `usage` field in assistant messages |
 | Git changes | `git log --numstat` in project directory |
 
+## Acknowledgments
+
+- Status bar Clawd animation sprites from [clawd-on-desk](https://github.com/rullerzhou-afk/clawd-on-desk) — an Electron desktop pet that senses AI coding agent state via hooks and plays pixel-art animations.
+
 ## Buy cc Some Tokens
 
 If this tool helps you, feel free to buy cc some tokens :)

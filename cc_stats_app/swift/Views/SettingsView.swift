@@ -569,7 +569,7 @@ struct SettingsView: View {
 
     // MARK: - Version
 
-    static let fallbackVersion = "0.12.4"
+    static let fallbackVersion = "0.12.5"
 
     /// 动态读取 Python 层写入的版本号，fallback 到编译时默认值
     static var appVersion: String {
@@ -639,6 +639,7 @@ struct SettingsView: View {
     }
 
     private func saveThemeSetting(_ theme: String) {
+        print("[CCStats] saveThemeSetting: theme=\(theme)")
         UserDefaults.standard.set(theme, forKey: "cc_stats_theme")
         onThemeChanged?(theme)
     }
@@ -792,6 +793,8 @@ struct SettingsView: View {
             notifyTestSent = false
         }
     }
+
+    // MARK: - Debug Animation
 
     private func autoFetchToken() {
         let username = NSUserName()

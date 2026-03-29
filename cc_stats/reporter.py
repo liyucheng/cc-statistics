@@ -6,7 +6,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from .analyzer import SessionStats, merge_stats, analyze_session
+from .analyzer import SessionStats, TokenUsage, merge_stats, analyze_session
 from .parser import find_gemini_sessions, find_sessions, parse_gemini_json, parse_jsonl
 
 # 模型定价 ($/M tokens)
@@ -82,6 +82,31 @@ def _fmt_cost(n: float) -> str:
     return f"${n:.3f}"
 
 
+def _daily_token_and_cost(
+    stats_list: list[SessionStats], day_key: str
+) -> tuple[TokenUsage, float]:
+    """计算某一天的 token 用量和费用（从各 session 的 token_by_date 中提取）
+
+    对于跨日 session，只取该 session 在 day_key 当天的 token 部分，
+    费用按当天 token 占该 session 总 token 的比例估算。
+    """
+    day_usage = TokenUsage()
+    day_cost = 0.0
+    for s in stats_list:
+        usage = s.token_by_date.get(day_key)
+        if not usage or usage.total == 0:
+            continue
+        day_usage.input_tokens += usage.input_tokens
+        day_usage.output_tokens += usage.output_tokens
+        day_usage.cache_read_input_tokens += usage.cache_read_input_tokens
+        day_usage.cache_creation_input_tokens += usage.cache_creation_input_tokens
+        # 按当天 token 占比分摊费用
+        if s.token_usage.total > 0:
+            fraction = usage.total / s.token_usage.total
+            day_cost += _estimate_cost(s) * fraction
+    return day_usage, day_cost
+
+
 def generate_report(period: str = "week") -> str:
     """生成周报或月报 Markdown
 
@@ -152,10 +177,11 @@ def generate_report(period: str = "week") -> str:
         day_stats_list = daily.get(day_key, [])
         if day_stats_list:
             ds = merge_stats(day_stats_list) if len(day_stats_list) > 1 else day_stats_list[0]
-            dc = _estimate_cost(ds)
+            # 按 token_by_date 取当天的 token，避免跨日 session 重复计数
+            day_token_usage, day_cost = _daily_token_and_cost(day_stats_list, day_key)
             daily_lines.append(
                 f"| {day_key} | {len(day_stats_list)} | {ds.user_message_count} | "
-                f"{_fmt_duration(ds.active_duration)} | {_fmt_tokens(ds.token_usage.total)} | {_fmt_cost(dc)} |"
+                f"{_fmt_duration(ds.active_duration)} | {_fmt_tokens(day_token_usage.total)} | {_fmt_cost(day_cost)} |"
             )
 
     # 工具调用 Top 5
