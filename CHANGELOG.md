@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.12.4 (2026-03-29)
+
+### Bug Fixes
+- Fix Swift compilation error: `daySessions` undefined in daily stats calculation (#17)
+
 ## v0.12.3 (2026-03-27)
 
 ### Bug Fixes

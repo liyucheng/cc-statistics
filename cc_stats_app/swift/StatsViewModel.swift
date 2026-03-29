@@ -365,7 +365,7 @@ final class StatsViewModel: ObservableObject {
             return DailyStatPoint(
                 date: dayStart,
                 label: formatter.string(from: dayStart),
-                sessions: daySessions.count,
+                sessions: buckets[i].count,
                 messages: dayStats.userInstructions,
                 tokens: dayStats.totalTokens,
                 cost: dayStats.estimatedCost,
