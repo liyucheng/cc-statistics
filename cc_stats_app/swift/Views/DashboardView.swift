@@ -249,46 +249,51 @@ struct DashboardView: View {
             if viewModel.isLoading && viewModel.stats == nil {
                 loadingState
             } else if let stats = viewModel.stats {
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: 14) {
-                        // Core modules (always shown)
-                        headerCards(stats: stats)
-                        tokenUsageSection(stats: stats)
-                        trendChart
-
-                        // Optional modules (controlled by settings)
-                        if DashboardModule.rateLimit.isVisible {
-                            rateLimitSection
-                        }
-                        if DashboardModule.developmentTime.isVisible {
-                            developmentTimeSection(stats: stats)
-                        }
-                        if DashboardModule.codeChanges.isVisible {
-                            codeChangesSection(stats: stats)
-                        }
-                        if DashboardModule.toolCalls.isVisible {
-                            toolCallsSection(stats: stats)
-                        }
-                        if DashboardModule.skillStats.isVisible {
-                            skillStatsSection(stats: stats)
-                        }
-                        if DashboardModule.efficiency.isVisible {
-                            efficiencySection(stats: stats)
-                        }
-                        if DashboardModule.costPrediction.isVisible {
-                            costPredictionSection(stats: stats)
-                        }
-                        if DashboardModule.processMonitor.isVisible {
-                            processSection
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    .padding(.bottom, 14)
-                }
+                claudeCodeStatsContent(stats: stats)
             } else {
                 emptyState
             }
+        }
+    }
+
+    @ViewBuilder
+    private func claudeCodeStatsContent(stats: SessionStats) -> some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 14) {
+                // Core modules (always shown)
+                headerCards(stats: stats)
+                tokenUsageSection(stats: stats)
+                trendChart
+
+                // Optional modules (controlled by settings)
+                if DashboardModule.rateLimit.isVisible {
+                    rateLimitSection
+                }
+                if DashboardModule.developmentTime.isVisible {
+                    developmentTimeSection(stats: stats)
+                }
+                if DashboardModule.codeChanges.isVisible {
+                    codeChangesSection(stats: stats)
+                }
+                if DashboardModule.toolCalls.isVisible {
+                    toolCallsSection(stats: stats)
+                }
+                if DashboardModule.skillStats.isVisible {
+                    skillStatsSection(stats: stats)
+                }
+                if DashboardModule.efficiency.isVisible {
+                    efficiencySection(stats: stats)
+                }
+                if DashboardModule.costPrediction.isVisible {
+                    costPredictionSection(stats: stats)
+                }
+                if DashboardModule.processMonitor.isVisible {
+                    processSection
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 14)
         }
     }
 
