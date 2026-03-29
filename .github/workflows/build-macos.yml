@@ -38,7 +38,7 @@ jobs:
               -framework Carbon \
               -lsqlite3 \
               -O \
-              -target ${{ matrix.arch }}-apple-macosx13.0
+              -target ${{ matrix.arch }}-apple-macosx12.0
 
       - name: Create .app bundle
         run: |

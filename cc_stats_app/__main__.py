@@ -220,7 +220,7 @@ def _compile_swift():
     swift_files = glob.glob(os.path.join(_swift_dir, "**", "*.swift"), recursive=True)
 
     arch = "arm64" if platform.machine() == "arm64" else "x86_64"
-    target = f"{arch}-apple-macosx13.0"
+    target = f"{arch}-apple-macosx12.0"
 
     # 编译到临时路径
     tmp_bin = os.path.join(_swift_dir, "CCStats.tmp")
