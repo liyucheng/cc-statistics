@@ -30,6 +30,12 @@ brew install androidZzT/tap/cc-statistics
 
 零依赖，纯 Python 标准库。
 
+## Clawd 状态栏动画
+
+状态栏 Clawd 像素宠物实时感知 AI 工作状态，自动切换动画：
+
+<img src="docs/clawd-states.png" width="600" alt="Clawd Animation States">
+
 ## 核心功能
 
 - **Clawd 状态栏动画** — 实时感知 AI 工作状态，像素风动画随 Claude 任务运行/暂停/完成自动切换

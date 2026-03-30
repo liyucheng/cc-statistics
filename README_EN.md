@@ -30,6 +30,12 @@ brew install androidZzT/tap/cc-statistics
 
 Zero dependencies — Python stdlib only.
 
+## Clawd Status Bar Animation
+
+A pixel-art Clawd mascot in the status bar reacts to AI work state in real time:
+
+<img src="docs/clawd-states.png" width="600" alt="Clawd Animation States">
+
 ## Key Features
 
 - **Clawd Status Bar Animation** — Real-time AI work state awareness with pixel-art animations that auto-switch as Claude runs/pauses/finishes
