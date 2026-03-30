@@ -267,8 +267,10 @@ def _write_current_version() -> None:
 
 
 def _is_bundled_binary() -> bool:
-    """检查 wheel 内置的预编译二进制是否可用（无需 version 文件）"""
-    return _is_binary_ready() and not _source_is_newer_than_binary()
+    """检查 wheel 内置的预编译二进制是否可用（无需 version 文件）。
+    只检查二进制存在且可执行，不比较源码 mtime，因为 wheel 安装时
+    源文件和二进制的时间戳可能不一致。"""
+    return _is_binary_ready()
 
 
 def main():
