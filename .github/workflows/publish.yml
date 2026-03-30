@@ -5,10 +5,13 @@ on:
     types: [published]
 
 permissions:
+  contents: read
   id-token: write
 
 jobs:
   publish:
+    # Wait for build-macos to finish uploading platform wheels
+    needs: []
     runs-on: ubuntu-latest
     environment: pypi
     steps:
@@ -18,10 +21,48 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Build
+      - name: Install build tools
+        run: pip install build
+
+      - name: Wait for platform wheels
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          pip install build
-          python -m build
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION="${TAG#v}"
+          # Wait up to 30 minutes for both platform wheels to appear
+          for i in $(seq 1 60); do
+            ASSETS=$(gh release view "$TAG" --repo "${{ github.repository }}" --json assets -q '.assets[].name')
+            ARM_WHL=$(echo "$ASSETS" | grep "cc_statistics.*macosx_12_0_arm64.whl" || true)
+            X86_WHL=$(echo "$ASSETS" | grep "cc_statistics.*macosx_12_0_x86_64.whl" || true)
+            if [ -n "$ARM_WHL" ] && [ -n "$X86_WHL" ]; then
+              echo "Both platform wheels found."
+              break
+            fi
+            echo "Waiting for platform wheels... ($i/60)"
+            sleep 30
+          done
+          if [ -z "$ARM_WHL" ] || [ -z "$X86_WHL" ]; then
+            echo "ERROR: Platform wheels not found after 30 minutes."
+            exit 1
+          fi
+
+      - name: Download platform wheels from Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          mkdir -p dist
+          gh release download "$TAG" \
+            --repo "${{ github.repository }}" \
+            --pattern "cc_statistics-*.whl" \
+            --dir dist
+
+      - name: Build fallback any wheel
+        run: python scripts/build_wheels.py --any-only
+
+      - name: List wheels
+        run: ls -la dist/*.whl
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1

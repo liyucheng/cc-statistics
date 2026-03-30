@@ -266,14 +266,21 @@ def _write_current_version() -> None:
         print(f"Warning: could not write version file: {e}", file=sys.stderr)
 
 
+def _is_bundled_binary() -> bool:
+    """检查 wheel 内置的预编译二进制是否可用（无需 version 文件）"""
+    return _is_binary_ready() and not _source_is_newer_than_binary()
+
+
 def main():
     # 写入当前版本供 Swift 层读取
     _write_current_version()
 
-    # 优先下载预编译二进制
-    if not _try_download_binary():
-        # fallback: 本地编译
-        _compile_swift()
+    # 1. 优先使用 wheel 内置的预编译二进制（跳过下载/编译）
+    if not _is_bundled_binary():
+        # 2. 尝试从 GitHub Release 下载预编译二进制
+        if not _try_download_binary():
+            # 3. fallback: 本地编译
+            _compile_swift()
 
     # 使用 open 命令启动 .app bundle（macOS 标准方式）
     subprocess.Popen(

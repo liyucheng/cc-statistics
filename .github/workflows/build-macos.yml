@@ -16,6 +16,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: pip install build
+
       - name: Extract version from tag
         id: version
         run: |
@@ -36,13 +43,14 @@ jobs:
               -framework Cocoa \
               -framework SwiftUI \
               -framework Carbon \
+              -framework UserNotifications \
               -lsqlite3 \
               -O \
               -target ${{ matrix.arch }}-apple-macosx12.0
 
       - name: Create .app bundle
         run: |
-          APP="CCStats.app"
+          APP="cc_stats_app/swift/CCStats.app"
           mkdir -p "$APP/Contents/MacOS"
           mkdir -p "$APP/Contents/Resources"
           cp -R cc_stats_app/swift/Resources/clawd "$APP/Contents/Resources/clawd" 2>/dev/null || true
@@ -52,12 +60,25 @@ jobs:
 
       - name: Package as zip (preserves permissions)
         run: |
-          ditto -c -k --keepParent CCStats.app CCStats-${{ matrix.arch }}.zip
+          ditto -c -k --keepParent cc_stats_app/swift/CCStats.app CCStats-${{ matrix.arch }}.zip
 
-      - name: Upload to Release
+      - name: Build platform wheel
+        run: |
+          python scripts/build_wheels.py --skip-compile --arch ${{ matrix.arch }} --platform-only
+
+      - name: Upload zip to Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release upload ${{ github.event.release.tag_name }} \
             CCStats-${{ matrix.arch }}.zip \
+            --clobber
+
+      - name: Upload platform wheel to Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          WHL=$(ls dist/cc_statistics-*-macosx_12_0_${{ matrix.arch }}.whl)
+          gh release upload ${{ github.event.release.tag_name }} \
+            "$WHL" \
             --clobber

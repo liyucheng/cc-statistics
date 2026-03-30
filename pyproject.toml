@@ -26,7 +26,7 @@ Repository = "https://github.com/androidZzT/cc-statistics"
 include = ["cc_stats*", "cc_stats_app*", "cc_stats_web*"]
 
 [tool.setuptools.package-data]
-cc_stats_app = ["swift/**/*.swift", "swift/Info.plist"]
+cc_stats_app = ["swift/**/*.swift", "swift/Info.plist", "swift/CCStats.app/**/*"]
 cc_stats_web = ["web/**/*"]
 
 [project.scripts]
