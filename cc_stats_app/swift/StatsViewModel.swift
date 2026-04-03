@@ -710,16 +710,83 @@ final class StatsViewModel: ObservableObject {
                 guard let self else { return }
                 self.updateAvailable = latestVersion
 
-                // 仅在首次发现新版本时发送系统通知
+                // 仅在首次发现新版本时触发自动升级
                 if self.hasNotifiedVersion != latestVersion {
                     self.hasNotifiedVersion = latestVersion
+                    self.autoUpgrade(to: latestVersion)
+                }
+            }
+        }
+    }
+
+    /// 后台自动升级 cc-statistics 到指定版本
+    private func autoUpgrade(to version: String) {
+        sendSystemNotification(
+            title: "cc-statistics 自动升级",
+            body: "正在自动升级到 v\(version)..."
+        )
+
+        Task.detached(priority: .utility) {
+            let (exitCode, stderr) = Self.runUpgradeProcess()
+
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                if exitCode == 0 {
                     self.sendSystemNotification(
-                        title: "cc-statistics 更新可用",
-                        body: "cc-statistics v\(latestVersion) 已发布，运行 pip install --upgrade cc-statistics 更新"
+                        title: "cc-statistics 升级完成",
+                        body: "已升级到 v\(version)，请重启 CCStats"
+                    )
+                } else {
+                    let errorMsg = stderr.isEmpty ? "未知错误" : stderr
+                    self.sendSystemNotification(
+                        title: "cc-statistics 升级失败",
+                        body: "升级失败：\(errorMsg)"
                     )
                 }
             }
         }
+    }
+
+    /// 执行升级命令，返回 (exitCode, stderr)
+    nonisolated private static func runUpgradeProcess() -> (Int32, String) {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+
+        // 按优先级搜索 pipx
+        let pipxPaths = [
+            "\(home)/.local/bin/pipx",
+            "/opt/homebrew/bin/pipx",
+            "/usr/local/bin/pipx",
+            "/usr/bin/pipx",
+        ]
+
+        let process = Process()
+        process.environment = ProcessInfo.processInfo.environment
+
+        if let pipxPath = pipxPaths.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) {
+            process.executableURL = URL(fileURLWithPath: pipxPath)
+            process.arguments = ["upgrade", "cc-statistics"]
+        } else {
+            // fallback 到 pip
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+            process.arguments = ["pip", "install", "--upgrade", "cc-statistics"]
+        }
+
+        let stderrPipe = Pipe()
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = stderrPipe
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            return (1, error.localizedDescription)
+        }
+
+        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+        let stderrStr = String(data: stderrData, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+        return (process.terminationStatus, stderrStr)
     }
 
     /// 从 PyPI 获取最新版本号
