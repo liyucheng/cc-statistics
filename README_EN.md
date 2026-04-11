@@ -7,18 +7,62 @@
 
 English | [中文](README.md)
 
-AI Coding session stats — Claude Code / Gemini CLI / Codex / Cursor, all from local files.
+**The only AI coding usage tracker that covers Claude Code, Gemini CLI, Codex CLI, and Cursor — in one native macOS app.**
 
-<img src="docs/screenshot.png" width="420" alt="CC Stats Dashboard">
+Track tokens, costs, sessions, and tool calls across all your AI coding tools. Everything runs locally; nothing leaves your machine.
 
-### CLI Demo
+```bash
+uv tool install cc-statistics
+cc-stats --all --since 7d   # all platforms, last 7 days
+cc-stats-app                # launch macOS menu-bar app
+```
+
+---
+
+## Platform Support
+
+| Feature | cc-statistics | phuryn/claude-usage | ccflare |
+|---------|:---:|:---:|:---:|
+| Claude Code | Yes | Yes | Yes |
+| Gemini CLI | Yes | No | No |
+| Codex CLI | Yes | No | No |
+| Cursor | Yes | No | No |
+| Native macOS app | Yes | No | No |
+| Session search + resume | Yes | No | No |
+| Pixel-art status bar mascot | Yes | No | No |
+| Slack / Feishu / DingTalk Webhook | Yes | No | No |
+| Zero dependencies | Yes | No | No |
+
+---
+
+## macOS App
+
+<img src="docs/desktop_now.png" width="520" alt="cc-statistics macOS Menu Bar App — dark theme dashboard with token and cost stats">
+
+Native SwiftUI panel. Pre-built binary — no local compilation required.
+
+- Status bar: Claude logo + today's tokens + cost; turns red when over limit
+- Right-click to switch display mode (Token+Cost / Token / Cost / Sessions)
+- Global hotkey `Cmd+Shift+C`
+
+### Clawd Status Bar Animation
+
+A pixel-art Clawd mascot in the status bar reacts to AI work state in real time:
+
+<img src="docs/clawd-states.png" width="600" alt="Clawd Animation States">
+
+---
+
+## CLI Demo
 
 <img src="docs/demo.gif" width="600" alt="CC Stats CLI Demo">
+
+---
 
 ## Installation
 
 ```bash
-# uv (recommended, fastest)
+# uv (recommended)
 uv tool install cc-statistics
 
 # pipx
@@ -30,17 +74,12 @@ brew install androidZzT/tap/cc-statistics
 
 Zero dependencies — Python stdlib only.
 
-## Clawd Status Bar Animation
-
-A pixel-art Clawd mascot in the status bar reacts to AI work state in real time:
-
-<img src="docs/clawd-states.png" width="600" alt="Clawd Animation States">
+---
 
 ## Key Features
 
-- **Clawd Status Bar Animation** — Real-time AI work state awareness with pixel-art animations that auto-switch as Claude runs/pauses/finishes
 - **Multi-Source** — Claude Code, Gemini CLI, Codex, Cursor — switch or aggregate stats across all sources
-- **macOS Native Menu Bar** — Pre-built binary, no local compilation; Claude logo + Token + Cost, turns red when over limit
+- **macOS Native Menu Bar** — Pre-built binary; Claude logo + Token + Cost, turns red when over limit
 - **Cost Estimation** — Built-in pricing for Opus / Sonnet / Haiku / Gemini 2.5 Pro / Flash / GPT-4o
 - **Usage Alerts** — Daily/weekly cost limits with system notifications when exceeded
 - **Session Search / Resume / Export** — Search past conversations by keyword, one-click resume command, export Markdown / share as image
@@ -49,13 +88,15 @@ A pixel-art Clawd mascot in the status bar reacts to AI work state in real time:
 - **100% Local** — All data read from local files, nothing sent over the network
 - **Bilingual** — Auto-follows system language, supports manual Chinese / English switch
 
+---
+
 ## Usage
 
 ### CLI (All Platforms)
 
 ```bash
 cc-stats                     # Analyze current directory sessions
-cc-stats --list              # List all projects (Claude + Gemini)
+cc-stats --list              # List all projects (Claude + Gemini + Codex + Cursor)
 cc-stats --all --since 3d    # Last 3 days, all projects
 cc-stats sailor --last 3     # Last 3 sessions for a project
 cc-stats --report week       # Generate weekly report (Markdown)
@@ -77,11 +118,6 @@ Auto-opens browser with a dark-themed statistics dashboard.
 cc-stats-app
 ```
 
-**Status Bar:**
-- Claude logo + today's token usage + estimated cost
-- Right-click to switch display mode (Token+Cost / Token / Cost / Sessions)
-- Turns red when over limit
-
 **Dashboard Panel (Native SwiftUI):**
 - Multi-source: Claude Code / Gemini CLI / Codex / Cursor, switch or aggregate
 - Theme: Follow System / Dark / Light
@@ -91,7 +127,8 @@ cc-stats-app
 - Session search + one-click resume (`claude --resume`)
 - Process manager: view all Claude process memory usage
 - Tool call breakdown: Skill and MCP tools expanded to specific names
-- Global hotkey `Cmd+Shift+C`
+
+---
 
 ## Data Sources
 
@@ -105,12 +142,14 @@ All data is read from local files. Nothing is sent over the network.
 | Cursor | `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb` |
 | Git Changes | `git log --numstat` in project directory |
 
+---
+
 ## Acknowledgments
 
-- Status bar Clawd animation sprites from [clawd-on-desk](https://github.com/rullerzhou-afk/clawd-on-desk) — an Electron desktop pet that senses AI coding agent state via hooks and plays pixel-art animations.
+Status bar Clawd animation sprites from [clawd-on-desk](https://github.com/rullerzhou-afk/clawd-on-desk) — an Electron desktop pet that senses AI coding agent state via hooks and plays pixel-art animations.
 
-## Buy cc Some Tokens
+---
 
-If this tool helps you, feel free to buy cc some tokens :)
+## Support
 
-<img src="docs/donate.jpg" width="200" alt="WeChat Donation">
+If cc-statistics saves you money on your AI coding bills, consider [sponsoring](https://github.com/sponsors/androidZzT) the project.
