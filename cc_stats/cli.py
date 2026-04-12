@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import unicodedata
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -118,6 +119,22 @@ def _resolve_project_name(proj_dir: Path, jsonl_files: list[Path]) -> str:
     return proj_dir.name
 
 
+def _display_width(s: str) -> int:
+    """计算字符串的终端显示宽度（CJK 字符占 2 列）"""
+    width = 0
+    for c in s:
+        if unicodedata.east_asian_width(c) in ('W', 'F'):
+            width += 2
+        else:
+            width += 1
+    return width
+
+
+def _pad_right(s: str, width: int) -> str:
+    """右填充空格至指定显示宽度"""
+    return s + ' ' * (width - _display_width(s))
+
+
 def _compare_projects(args) -> None:
     """对比所有项目的关键指标"""
     from .formatter import _fmt_duration, _fmt_tokens
@@ -191,12 +208,12 @@ def _compare_projects(args) -> None:
     projects.sort(key=lambda p: p["tokens"], reverse=True)
 
     # 计算列宽
-    max_name = max(len(p["name"]) for p in projects)
+    max_name = max(_display_width(p["name"]) for p in projects)
     max_name = max(max_name, 4)  # 最小宽度
 
     # 表头
     print()
-    print(f"  {'项目':<{max_name}}  {'会话':>4}  {'指令':>5}  {'活跃时长':>10}  {'Token':>8}  {'费用':>8}  {'代码':>10}")
+    print(f"  {_pad_right('项目', max_name)}  {'会话':>4}  {'指令':>5}  {'活跃时长':>10}  {'Token':>8}  {'费用':>8}  {'代码':>10}")
     print("─" * (max_name + 60))
 
     total_sessions = 0
@@ -210,7 +227,7 @@ def _compare_projects(args) -> None:
         cost_str = f"${p['cost']:.0f}" if p["cost"] >= 1 else f"${p['cost']:.2f}"
         code_str = f"+{p['added']}/-{p['removed']}"
 
-        print(f"  {p['name']:<{max_name}}  {p['sessions']:>4}  {p['instructions']:>5}  {dur_str:>10}  {tok_str:>8}  {cost_str:>8}  {code_str:>10}")
+        print(f"  {_pad_right(p['name'], max_name)}  {p['sessions']:>4}  {p['instructions']:>5}  {dur_str:>10}  {tok_str:>8}  {cost_str:>8}  {code_str:>10}")
 
         total_sessions += p["sessions"]
         total_instructions += p["instructions"]
@@ -218,7 +235,7 @@ def _compare_projects(args) -> None:
         total_cost += p["cost"]
 
     print("─" * (max_name + 60))
-    print(f"  {'合计':<{max_name}}  {total_sessions:>4}  {total_instructions:>5}  {'':>10}  {_fmt_tokens(total_tokens):>8}  ${total_cost:>7.0f}")
+    print(f"  {_pad_right('合计', max_name)}  {total_sessions:>4}  {total_instructions:>5}  {'':>10}  {_fmt_tokens(total_tokens):>8}  ${total_cost:>7.0f}")
     print()
 
 
