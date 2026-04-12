@@ -1,135 +1,254 @@
-# cc-statistics
+<div align="center">
+  <img src="docs/desktop_now.png" width="480" alt="cc-statistics macOS App" style="border-radius: 16px;">
+  <h1>cc-statistics</h1>
+  <p><strong>The only AI coding tracker that unifies Claude Code, Gemini CLI, Codex CLI, and Cursor — in one native macOS app.</strong></p>
+  <p><em>Track every token, cost, and session across all your AI tools. 100% local. Zero dependencies.</em></p>
 
-[![PyPI](https://img.shields.io/pypi/v/cc-statistics?color=blue)](https://pypi.org/project/cc-statistics/)
-[![Downloads](https://img.shields.io/pypi/dm/cc-statistics?color=green)](https://pypi.org/project/cc-statistics/)
-[![GitHub stars](https://img.shields.io/github/stars/androidZzT/cc-statistics?style=social)](https://github.com/androidZzT/cc-statistics)
-[![License](https://img.shields.io/github/license/androidZzT/cc-statistics)](LICENSE)
+  <p>
+    <a href="https://pypi.org/project/cc-statistics/"><img src="https://img.shields.io/pypi/v/cc-statistics?color=blue&style=flat-square&logo=python" alt="PyPI"></a>
+    <a href="https://pypi.org/project/cc-statistics/"><img src="https://img.shields.io/pypi/dm/cc-statistics?color=green&style=flat-square" alt="Downloads"></a>
+    <a href="https://github.com/androidZzT/cc-statistics/stargazers"><img src="https://img.shields.io/github/stars/androidZzT/cc-statistics?style=flat-square" alt="Stars"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/github/license/androidZzT/cc-statistics?style=flat-square" alt="License"></a>
+    <img src="https://img.shields.io/badge/zero--dependencies-stdlib%20only-orange?style=flat-square" alt="Zero Dependencies">
+    <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey?style=flat-square" alt="Platform">
+  </p>
 
-[English](README_EN.md) | 中文
+  <p>
+    <a href="#-why-cc-statistics">Why?</a> &bull;
+    <a href="#-features">Features</a> &bull;
+    <a href="#%EF%B8%8F-screenshots">Screenshots</a> &bull;
+    <a href="#-quick-start">Quick Start</a> &bull;
+    <a href="#-cli-reference">CLI</a> &bull;
+    <a href="README_CN.md">中文</a>
+  </p>
+</div>
 
-AI Coding 会话统计工具 — 支持 Claude Code / Gemini CLI / Codex / Cursor，从本地数据中提取工程指标。
+---
 
-<img src="docs/screenshot.png" width="420" alt="CC Stats Dashboard">
+## 🤔 Why cc-statistics?
 
-### CLI Demo
+You're using multiple AI coding tools. But do you actually know:
 
-<img src="docs/demo.gif" width="600" alt="CC Stats CLI Demo">
+- 💸 **What your combined spend is** across Claude Code, Gemini CLI, Codex, and Cursor?
+- 🔧 **Which MCP tools are being called most** — and whether they're worth the tokens?
+- ⏱️ **How much time Claude is actually working** versus waiting for you?
+- 📈 **Which projects are consuming the most** — and across which models?
 
-## 安装
+Most tools only answer this for Claude Code. cc-statistics answers it for all four.
 
-```bash
-# uv（推荐，速度最快）
-uv tool install cc-statistics
+### How does it compare?
 
-# pipx（隔离环境，任意终端可用）
-pipx install cc-statistics
+| | cc-statistics | CCDash | claude-usage | ccflare |
+|---|:---:|:---:|:---:|:---:|
+| **Claude Code** | ✅ | ✅ | ✅ | ✅ |
+| **Gemini CLI** | ✅ | ❌ | ❌ | ❌ |
+| **Codex CLI** | ✅ | ❌ | ❌ | ❌ |
+| **Cursor** | ✅ | ❌ | ❌ | ❌ |
+| **Native macOS App** | ✅ | ❌ | ❌ | ❌ |
+| **Pixel-Art Mascot (Clawd)** | ✅ | ❌ | ❌ | ❌ |
+| **Session Search & Resume** | ✅ | ✅ | ❌ | ❌ |
+| **Weekly / Monthly Reports** | ✅ | ✅ | ❌ | ❌ |
+| **Webhook** (Slack / Feishu / DingTalk) | ✅ | ✅ Slack/Discord | ❌ | ❌ |
+| **Tool Call Analytics** | ✅ | ✅ | ❌ | ❌ |
+| **Code Changes by Language** | ✅ | ❌ | ❌ | ❌ |
+| **AI vs User Time** | ✅ | ❌ | ❌ | ❌ |
+| **Usage Alerts** | ✅ | ✅ | ❌ | ❌ |
+| **Usage Quota Predictor** | ✅ | ✅ | ❌ | ❌ |
+| **Share Session Messages** | ✅ | ❌ | ❌ | ❌ |
+| **Web Dashboard** | ✅ | ✅ | ✅ | ✅ |
+| **CLI Tool** | ✅ | ✅ | ❌ | ✅ |
+| **Zero Dependencies** | ✅ | ✅ | ❌ | ❌ |
+| Cache Efficiency Grade | ⏳ planned | ✅ | ❌ | ❌ |
+| Live Stream | ⏳ planned | ✅ | ❌ | ❌ |
 
-# Homebrew（macOS / Linux）
-brew install androidZzT/tap/cc-statistics
-```
+> cc-statistics is a community project, not affiliated with Anthropic, Google, or OpenAI.
 
-零依赖，纯 Python 标准库。
+---
 
-## Clawd 状态栏动画
+## 🚀 Features
 
-状态栏 Clawd 像素宠物实时感知 AI 工作状态，自动切换动画：
+### 🌐 4-Platform Unified View
+> Claude Code · Gemini CLI · Codex CLI · Cursor — switch between platforms or aggregate all four into a single report. Each source is read entirely from local files; no API keys, no accounts, no network requests.
+
+### 🖥️ Native macOS Menu Bar App
+> Pre-built SwiftUI binary — launch with `cc-stats-app` and it lives in your menu bar permanently. Shows Claude logo + today's token count + estimated cost at a glance. Turns **red** when you hit your daily usage quota. Right-click to switch display modes. Global hotkey `Cmd+Shift+C` opens the full dashboard from anywhere.
+
+### 🐾 Clawd — Pixel-Art Status Bar Mascot
+> A pixel-art Clawd mascot reacts to Claude Code's agent state in real time: idle, thinking, typing, happy, sleeping, and error — each with its own animated sprite. Built on [clawd-on-desk](https://github.com/rullerzhou-afk/clawd-on-desk) hook integration.
 
 <img src="docs/clawd-states.png" width="600" alt="Clawd Animation States">
 
-## 核心功能
+### 📊 Usage Quota Predictor
+> Real-time prediction of when you'll hit your usage quota based on current burn rate. Displays estimated time remaining, projected reset time, and risk level — so you can pace your usage and avoid unexpected throttling.
 
-- **Clawd 状态栏动画** — 实时感知 AI 工作状态，像素风动画随 Claude 任务运行/暂停/完成自动切换
-- **多数据源** — 支持 Claude Code、Gemini CLI、Codex、Cursor，可切换或聚合统计
-- **macOS 原生状态栏** — 预编译二进制，无需本地编译；Claude logo + Token + 费用，超限变红预警
-- **费用估算** — 内置主流模型定价（Opus / Sonnet / Haiku / Gemini 2.5 Pro / Flash / GPT-4o）
-- **用量预警** — 单日/每周费用上限，超限系统通知
-- **会话搜索 / 恢复 / 导出** — 按关键词搜索历史对话，一键复制恢复命令，导出 Markdown / 分享长图
-- **周报 / 月报** — 自动生成 Markdown 报告，支持飞书 / 钉钉 / Slack Webhook 推送
-- **多维统计** — 指令数、工具调用 Top 10、AI vs 用户时长、代码变更（按语言）、Token（按模型）
-- **纯本地** — 所有数据读取自本地文件，不联网，不上传
-- **双语** — 自动跟随系统语言，支持中文 / English 手动切换
+### 🔍 Session Search & Resume
+> Search your entire session history by keyword across all platforms. Results show timestamps and a ready-to-run resume command — one copy-paste and you're back in context:
+> ```bash
+> claude --resume <session-id>
+> ```
 
-## 使用
+### 💬 Share Session Messages
+> Export and share individual session conversations as clean, formatted text — useful for documenting AI-assisted work, sharing context with teammates, or archiving important sessions.
 
-### CLI 命令行（全平台）
+### 📊 Multi-Dimensional Analytics
+> Instructions count · Tool calls Top 10 (Skill and MCP tools broken out by name) · AI processing time vs user active time · Code changes by language (via `git log --numstat`) · Token breakdown by model · Cost estimation with built-in pricing for Opus / Sonnet / Haiku / Gemini 2.5 Pro / Flash / GPT-4o
+
+### 🔔 Usage Alerts
+> Set daily and weekly cost limits. When you're over threshold, the macOS menu bar icon turns red and a native system notification fires — respecting your Focus modes, no app in foreground required.
+
+### 📋 Weekly & Monthly Reports
+> Auto-generate Markdown summaries for any period: total tokens, cost by model, most active projects, top tool calls, code changes by language. Push directly to your team channel:
+> ```bash
+> cc-stats --report week
+> cc-stats --notify https://hooks.slack.com/services/xxx
+> ```
+> Slack, Feishu, and DingTalk webhooks all supported.
+
+### ⚡ Project Comparison
+> See which projects are consuming the most resources side by side:
+> ```bash
+> cc-stats --compare --since 1w
+> ```
+
+### 🌐 Web Dashboard
+> Browser-based dark-themed dashboard for all platforms — useful on Linux/Windows or when you want a larger view than the menu bar panel.
+
+### 🔒 100% Local & Zero Dependencies
+> All data is read from local files. Nothing is sent over the network. Pure Python standard library — no `pip install`, no npm, no Docker.
+
+---
+
+## 🖼️ Screenshots
+
+<table>
+  <tr>
+    <td align="center"><strong>🖥️ macOS App — Dark Mode</strong></td>
+    <td align="center"><strong>🖥️ macOS App — Light Mode</strong></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/cc-stat-dark.png" alt="macOS App Dark" width="100%"></td>
+    <td><img src="docs/screenshots/cc-stat-light.png" alt="macOS App Light" width="100%"></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>📊 Usage Quota Predictor</strong></td>
+    <td align="center"><strong>🔴 Max Usage Reached</strong></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/cc-stat-predict.png" alt="Usage Quota Predictor" width="100%"></td>
+    <td><img src="docs/screenshots/cc-stat-max-usage.png" alt="Max Usage" width="100%"></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>🔍 Session List</strong></td>
+    <td align="center"><strong>🔧 Tool Call Analytics</strong></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/cc-stat-sessions.png" alt="Session List" width="100%"></td>
+    <td><img src="docs/screenshots/cc-stat-tools.png" alt="Tool Call Analytics" width="100%"></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>⚡ Skill / MCP Analytics</strong></td>
+    <td align="center"><strong>💬 Share Session Messages</strong></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/cc-stat-skill.png" alt="Skill Analytics" width="100%"></td>
+    <td><img src="docs/screenshots/cc-stat-share-msgs.png" alt="Share Messages" width="100%"></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>🌐 4-Platform Unified View</strong></td>
+    <td align="center"><strong>⚙️ Settings</strong></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/cc-stat-multiplatform.png" alt="Multi-Platform" width="100%"></td>
+    <td><img src="docs/screenshots/cc-stat-settings.png" alt="Settings" width="100%"></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>🔔 Notifications</strong></td>
+    <td align="center"><strong>🌐 Web Dashboard</strong></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/cc-stat-notification.png" alt="Notifications" width="100%"></td>
+    <td><img src="docs/screenshots/cc-stat-web.png" alt="Web Dashboard" width="100%"></td>
+  </tr>
+</table>
+
+### CLI Demo
+
+<img src="docs/screenshots/cc-stat-cli.png" width="680" alt="CC Stats CLI Demo">
+
+---
+
+## ⚡ Quick Start
+
+### Prerequisites
+
+- Python 3.8+
+- At least one of: Claude Code CLI, Gemini CLI, Codex CLI, or Cursor installed and used
+
+### 3 steps
 
 ```bash
-cc-stats                     # 分析当前目录的所有会话
-cc-stats --list              # 列出所有项目（Claude + Gemini）
-cc-stats --all --since 3d    # 最近 3 天所有项目
-cc-stats sailor --last 3     # 某项目最近 3 个会话
-cc-stats --report week       # 生成周报（Markdown）
-cc-stats --compare --since 1w # 最近一周项目对比
-cc-stats --notify https://hooks.slack.com/services/xxx  # Webhook 推送
-```
+# 1. Install
+uv tool install cc-statistics   # or: pipx install cc-statistics
 
-### Web Dashboard（全平台）
+# 2. Run your first report (all platforms, last 7 days)
+cc-stats --all --since 7d
 
-```bash
-cc-stats-web
-```
-
-自动打开浏览器，展示暗色主题统计面板。
-
-### macOS 状态栏面板
-
-```bash
+# 3. Launch macOS menu bar app (macOS only)
 cc-stats-app
 ```
 
-**状态栏：**
-- Claude logo + 当日 Token 用量 + 预估费用
-- 右键菜单切换显示模式（Token+费用 / Token / 费用 / 会话数）
-- 超限变红预警
+That's it. No configuration file needed.
 
-**统计面板（原生 SwiftUI）：**
-- 多数据源：Claude Code / Gemini CLI / Codex / Cursor，可切换或聚合展示
-- 主题切换：跟随系统 / 深色 / 浅色
-- 用量预警：单日/每周费用上限，超限系统通知
-- 导出统计数据（JSON / CSV，自动保存到桌面并打开）
-- 设置页：开机自启、语言切换、主题切换、版本更新检测
-- 会话搜索 + 一键恢复（复制 `claude --resume`）
-- 进程管理：查看所有 Claude 进程内存占用
-- 工具调用拆分：Skill 和 MCP 工具展开为具体名称
-- 全局快捷键 `Cmd+Shift+C`
+**Alternative install methods:**
 
-## 数据来源
+```bash
+# pipx
+pipx install cc-statistics
 
-所有数据读取自本地文件，不联网，不上传：
+# Homebrew (macOS / Linux)
+brew install androidZzT/tap/cc-statistics
+```
 
-| 数据源 | 路径 |
-|--------|------|
+---
+
+## 📖 CLI Reference
+
+```bash
+cc-stats                      # Analyze current directory sessions
+cc-stats --list               # List all detected projects (all platforms)
+cc-stats --all --since 3d     # Last 3 days, all projects, all platforms
+cc-stats --all --since 1w     # Last week
+cc-stats myproject --last 3   # Last 3 sessions for a specific project
+cc-stats --report week        # Generate weekly Markdown report
+cc-stats --report month       # Generate monthly Markdown report
+cc-stats --compare --since 1w # Side-by-side project comparison
+cc-stats --notify <url>       # Push report to Slack / Feishu / DingTalk webhook
+cc-stats-web                  # Open web dashboard in browser
+cc-stats-app                  # Launch macOS menu bar app
+```
+
+---
+
+## 🗂️ Data Sources
+
+All data is read from local files. Nothing is sent over the network.
+
+| Source | Local path |
+|--------|-----------|
 | Claude Code | `~/.claude/projects/<project>/<session>.jsonl` |
 | Gemini CLI | `~/.gemini/tmp/<project>/chats/<session>.json` |
-| Codex | `~/.codex/sessions/*.jsonl` |
+| Codex CLI | `~/.codex/sessions/*.jsonl` |
 | Cursor | `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb` |
-| Git 变更 | 项目目录的 `git log --numstat` |
+| Git Changes | `git log --numstat` in project directory |
 
-### 各平台数据能力对比
+---
 
-| 数据维度 | Claude Code | Codex (OpenAI) | Gemini CLI | Cursor |
-|----------|:-----------:|:--------------:|:----------:|:------:|
-| 会话列表 | ✅ | ✅ | ✅ | ✅ |
-| 消息内容 | ✅ | ✅ | ✅ | ❌ |
-| Input Tokens | ✅ | ✅ | ✅ | ❌ |
-| Output Tokens | ✅ | ✅ | ✅ | ❌ |
-| Cache Read Tokens | ✅ | ✅ | ✅ | ❌ |
-| Cache Creation Tokens | ✅ | ❌ | ❌ | ❌ |
-| 模型名称 | ✅ | ✅ | ✅ | ✅ |
-| 费用估算 | ✅ 4维 | ⚠️ 3维 | ⚠️ 3维 | ❌ |
-| 代码行数 | ✅ | ❌ | ❌ | ✅ |
-| AI 代码采纳率 | ❌ | ❌ | ❌ | ✅ |
-| 工具调用统计 | ✅ | ❌ | ❌ | ❌ |
-| 项目路径 | ✅ | ✅ | ✅ | ❌ |
-| 用量百分比 | ✅ | ❌ | ❌ | ❌ |
-| 消耗速率告警 | ✅ | ❌ | ❌ | ❌ |
+## Acknowledgments
 
-## 致谢
+Status bar Clawd animation sprites from [clawd-on-desk](https://github.com/rullerzhou-afk/clawd-on-desk) — an Electron desktop pet that senses AI coding agent state via hooks and plays pixel-art animations.
 
-- 状态栏 Clawd 动画素材来自 [clawd-on-desk](https://github.com/rullerzhou-afk/clawd-on-desk) — 一个 Electron 桌面宠物应用，通过 hook 系统实时感知 AI coding agent 的工作状态并播放像素风动画。
+---
 
-## 请 cc 吃 Token
+## Support
 
-如果这个工具对你有帮助，欢迎请 cc 吃点 Token :)
-
-<img src="docs/donate.jpg" width="200" alt="微信赞赏码">
+If cc-statistics saves you money on your AI coding bills, consider [sponsoring](https://github.com/sponsors/androidZzT) the project.
