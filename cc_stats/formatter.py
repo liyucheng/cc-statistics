@@ -343,12 +343,106 @@ def format_stats(stats: SessionStats, session_count: int = 1) -> str:
         lines.append(f"  AI 利用率: {ai_ratio}%")
         lines.append("")
 
-    # ── ⑦ Usage Quota 预测 ──
+    # ── ⑧ 编码节奏与工作模式 ──
+    rhythm_block = format_coding_rhythm(stats)
+    if rhythm_block:
+        lines.append(rhythm_block)
+
+    # ── ⑨ Usage Quota 预测 ──
     from .rate_limiter import analyze_rate_limit
     rl_status = analyze_rate_limit(stats)
     rl_block = format_rate_limit(rl_status)
     if rl_block:
         lines.append(rl_block)
+
+    return "\n".join(lines)
+
+
+_PERIOD_LABELS = {
+    "morning": "Morning   (06-12)",
+    "afternoon": "Afternoon (12-18)",
+    "evening": "Evening   (18-24)",
+    "night": "Night     (00-06)",
+}
+
+_PERIOD_ORDER = ["morning", "afternoon", "evening", "night"]
+
+_MODE_ICONS = {
+    "Exploration": "🔍",
+    "Building": "🏗️",
+    "Execution": "⚡",
+}
+
+
+def format_coding_rhythm(stats: SessionStats) -> str:
+    """格式化编码节奏与工作模式区块（⑧）"""
+    has_rhythm = bool(stats.coding_rhythm)
+    has_modes = bool(stats.work_mode_distribution)
+    if not has_rhythm and not has_modes:
+        return ""
+
+    lines: list[str] = []
+    sep = _dim("─" * 60)
+
+    lines.append(f"  {_cyan_bold('⑧')} {_bold('编码节奏与工作模式')}")
+    lines.append(sep)
+
+    # Coding Rhythm — 水平柱状图（按 token 数量）
+    if has_rhythm:
+        lines.append(f"  {_dim('编码节奏 (按时段):')}")
+
+        max_tokens = max(
+            (int(d.get("token_count", 0)) for d in stats.coding_rhythm.values()),
+            default=0,
+        )
+        peak_period = max(
+            stats.coding_rhythm,
+            key=lambda p: int(stats.coding_rhythm[p].get("token_count", 0)),
+        )
+
+        for period in _PERIOD_ORDER:
+            data = stats.coding_rhythm.get(period)
+            if data is None:
+                label = _PERIOD_LABELS[period]
+                lines.append(f"    {_dim(label)}  {_dim('░' * 20)}  {_dim('—')}")
+                continue
+
+            tokens = int(data.get("token_count", 0))
+            sessions = int(data.get("session_count", 0))
+            minutes = float(data.get("active_minutes", 0))
+            label = _PERIOD_LABELS[period]
+            bar = _bar(tokens, max_tokens, 20)
+            token_str = _fmt_tokens(tokens)
+            detail = f"{sessions}s {minutes:.0f}min"
+
+            if period == peak_period:
+                lines.append(
+                    f"    {_yellow(label)}  {bar}  {_yellow(token_str)}  "
+                    f"{_dim(detail)}  {_yellow('★')}"
+                )
+            else:
+                lines.append(
+                    f"    {label}  {bar}  {token_str}  {_dim(detail)}"
+                )
+        lines.append("")
+
+    # Work Mode Distribution
+    if has_modes:
+        lines.append(f"  {_dim('工作模式分布:')}")
+        total_sessions = sum(stats.work_mode_distribution.values())
+        for mode in ("Exploration", "Building", "Execution"):
+            count = stats.work_mode_distribution.get(mode, 0)
+            pct = count / max(total_sessions, 1) * 100
+            icon = _MODE_ICONS.get(mode, "")
+            bar = _bar(count, total_sessions, 15)
+            if pct >= 50:
+                pct_str = _yellow(f"{pct:.0f}%")
+            else:
+                pct_str = f"{pct:.0f}%"
+            lines.append(
+                f"    {icon} {mode:<13} {bar}  {pct_str}  {_dim(f'({count}s)')}"
+            )
+        lines.append("")
 
     return "\n".join(lines)
 
@@ -364,7 +458,7 @@ def format_rate_limit(status: RateLimitStatus) -> str:
     lines: list[str] = []
     sep = _dim("─" * 60)
 
-    lines.append(f"  {_cyan_bold('⑦')} {_bold('Usage Quota Forecast')}")
+    lines.append(f"  {_cyan_bold('⑨')} {_bold('Usage Quota Forecast')}")
     lines.append(sep)
 
     # 状态标签

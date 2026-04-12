@@ -219,6 +219,15 @@ class SessionStats:
     # 仅保留最近 30 分钟数据以控制内存
     token_by_minute: dict[str, TokenUsage] = field(default_factory=dict)
 
+    # 9. 编码节奏分析
+    # key: "morning"|"afternoon"|"evening"|"night"
+    # value: {"session_count": int, "token_count": int, "active_minutes": float}
+    coding_rhythm: dict[str, dict[str, int | float]] = field(default_factory=dict)
+
+    # 10. 工作模式分布
+    # key: "Exploration"|"Building"|"Execution", value: session count
+    work_mode_distribution: dict[str, int] = field(default_factory=dict)
+
 
 # Claude 模型定价 (USD per 1M tokens)
 # https://docs.anthropic.com/en/docs/about-claude/models
@@ -423,6 +432,27 @@ def _collect_git_stats(
 
     stats.lines_by_lang = dict(lang_stats)
     return stats
+
+
+def _time_period(hour: int) -> str:
+    """将小时数映射到时段名称"""
+    if 6 <= hour < 12:
+        return "morning"
+    if 12 <= hour < 18:
+        return "afternoon"
+    if 18 <= hour < 24:
+        return "evening"
+    return "night"
+
+
+def classify_work_mode(user_message_count: int, total_added: int, total_removed: int) -> str:
+    """根据 session 特征分类工作模式"""
+    code_per_msg = (total_added + total_removed) / max(user_message_count, 1)
+    if code_per_msg > 50:
+        return "Execution"
+    if code_per_msg < 5:
+        return "Exploration"
+    return "Building"
 
 
 def analyze_session(session: Session) -> SessionStats:
@@ -682,6 +712,24 @@ def analyze_session(session: Session) -> SessionStats:
             stats.git_ai_removed = git.ai_removed
             stats.git_lines_by_lang = git.lines_by_lang
 
+    # -------- 9. 编码节奏分析 --------
+    if stats.start_time:
+        period = _time_period(stats.start_time.astimezone().hour)
+        active_mins = stats.active_duration.total_seconds() / 60.0
+        stats.coding_rhythm = {
+            period: {
+                "session_count": 1,
+                "token_count": stats.token_usage.total,
+                "active_minutes": round(active_mins, 1),
+            }
+        }
+
+    # -------- 10. 工作模式分类 --------
+    mode = classify_work_mode(
+        stats.user_message_count, stats.total_added, stats.total_removed
+    )
+    stats.work_mode_distribution = {mode: 1}
+
     return stats
 
 
@@ -781,6 +829,25 @@ def merge_stats(all_stats: list[SessionStats]) -> SessionStats:
             m.output_tokens += tu.output_tokens
             m.cache_read_input_tokens += tu.cache_read_input_tokens
             m.cache_creation_input_tokens += tu.cache_creation_input_tokens
+
+        # 编码节奏合并
+        for period, data in s.coding_rhythm.items():
+            if period not in merged.coding_rhythm:
+                merged.coding_rhythm[period] = {
+                    "session_count": 0, "token_count": 0, "active_minutes": 0.0,
+                }
+            mr = merged.coding_rhythm[period]
+            mr["session_count"] += data["session_count"]
+            mr["token_count"] += data["token_count"]
+            mr["active_minutes"] = round(
+                float(mr["active_minutes"]) + float(data["active_minutes"]), 1
+            )
+
+        # 工作模式合并
+        for mode, count in s.work_mode_distribution.items():
+            merged.work_mode_distribution[mode] = (
+                merged.work_mode_distribution.get(mode, 0) + count
+            )
 
     # 合并后裁剪 token_by_minute 只保留最近 30 分钟
     if merged.token_by_minute:
