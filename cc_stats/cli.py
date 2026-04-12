@@ -135,6 +135,11 @@ def _pad_right(s: str, width: int) -> str:
     return s + ' ' * (width - _display_width(s))
 
 
+def _pad_left(s: str, width: int) -> str:
+    """左填充空格至指定显示宽度（右对齐）"""
+    return ' ' * (width - _display_width(s)) + s
+
+
 def _compare_projects(args) -> None:
     """对比所有项目的关键指标"""
     from .formatter import _fmt_duration, _fmt_tokens
@@ -213,8 +218,15 @@ def _compare_projects(args) -> None:
 
     # 表头
     print()
-    print(f"  {_pad_right('项目', max_name)}  {'会话':>4}  {'指令':>5}  {'活跃时长':>10}  {'Token':>8}  {'费用':>8}  {'代码':>10}")
-    print("─" * (max_name + 60))
+    COL_SESSIONS = 4
+    COL_INSTRUCTIONS = 5
+    COL_DURATION = 10
+    COL_TOKENS = 8
+    COL_COST = 8
+    COL_CODE = 10
+    print(f"  {_pad_right('项目', max_name)}  {_pad_left('会话', COL_SESSIONS)}  {_pad_left('指令', COL_INSTRUCTIONS)}  {_pad_left('活跃时长', COL_DURATION)}  {_pad_left('Token', COL_TOKENS)}  {_pad_left('费用', COL_COST)}  {_pad_left('代码', COL_CODE)}")
+    sep_width = max_name + 2 + COL_SESSIONS + 2 + COL_INSTRUCTIONS + 2 + COL_DURATION + 2 + COL_TOKENS + 2 + COL_COST + 2 + COL_CODE + 2
+    print("─" * sep_width)
 
     total_sessions = 0
     total_instructions = 0
@@ -234,7 +246,7 @@ def _compare_projects(args) -> None:
         total_tokens += p["tokens"]
         total_cost += p["cost"]
 
-    print("─" * (max_name + 60))
+    print("─" * sep_width)
     print(f"  {_pad_right('合计', max_name)}  {total_sessions:>4}  {total_instructions:>5}  {'':>10}  {_fmt_tokens(total_tokens):>8}  ${total_cost:>7.0f}")
     print()
 
