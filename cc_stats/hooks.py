@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import sys
 from pathlib import Path
 from typing import Any
@@ -180,8 +181,14 @@ def process_hook_event(event: dict[str, Any]) -> None:
 # ---------------------------------------------------------------------------
 
 def get_hook_command() -> str:
-    """获取当前环境的 hook 命令"""
-    # 优先使用 python -m 方式，兼容性最好
+    """获取当前环境的 hook 命令
+
+    优先查找 cc-stats-hooks entry-point binary（uv/pipx 安装场景下可靠），
+    找不到时 fallback 到 python -m cc_stats.hooks。
+    """
+    entry_point = shutil.which("cc-stats-hooks")
+    if entry_point:
+        return entry_point
     return f"{sys.executable} -m cc_stats.hooks"
 
 
@@ -233,6 +240,16 @@ def install_hooks(scope: str = "user") -> bool:
         pre_tool_hooks.append(pre_tool_entry)
     hooks["PreToolUse"] = pre_tool_hooks
 
+    # Notification hook — 空闲等待通知
+    notif_hooks = hooks.get("Notification", [])
+    notif_entry = {
+        "type": "command",
+        "command": hook_cmd,
+    }
+    if not _hook_exists(notif_hooks, hook_cmd):
+        notif_hooks.append(notif_entry)
+    hooks["Notification"] = notif_hooks
+
     settings["hooks"] = hooks
 
     # 写入配置
@@ -262,7 +279,7 @@ def uninstall_hooks(scope: str = "user") -> bool:
     hooks = settings.get("hooks", {})
     hook_cmd = get_hook_command()
 
-    for event_type in ("Stop", "PreToolUse"):
+    for event_type in ("Stop", "PreToolUse", "Notification"):
         event_hooks = hooks.get(event_type, [])
         hooks[event_type] = [
             h for h in event_hooks
@@ -289,11 +306,12 @@ def _hook_exists(hooks_list: list, hook_cmd: str) -> bool:
 
 
 def _hook_matches(hook: dict[str, Any] | Any, hook_cmd: str) -> bool:
-    """检查 hook 条目是否匹配"""
+    """检查 hook 条目是否匹配（兼容旧格式和新格式）"""
     if not isinstance(hook, dict):
         return False
     cmd = hook.get("command", "")
-    return "cc_stats.hooks" in cmd
+    # 匹配旧格式 (python -m cc_stats.hooks) 和新格式 (cc-stats-hooks)
+    return "cc_stats.hooks" in cmd or "cc-stats-hooks" in cmd
 
 
 # ---------------------------------------------------------------------------
