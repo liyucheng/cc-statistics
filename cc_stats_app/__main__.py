@@ -273,15 +273,26 @@ def _is_bundled_binary() -> bool:
     return _is_binary_ready()
 
 
+def _is_development_checkout() -> bool:
+    """是否在源码仓库（editable 开发模式）中运行。"""
+    repo_root = os.path.dirname(os.path.dirname(__file__))
+    return os.path.exists(os.path.join(repo_root, ".git"))
+
+
 def main():
     # 写入当前版本供 Swift 层读取
     _write_current_version()
 
-    # 1. 优先使用 wheel 内置的预编译二进制（跳过下载/编译）
-    if not _is_bundled_binary():
-        # 2. 尝试从 GitHub Release 下载预编译二进制
-        if not _try_download_binary():
-            # 3. fallback: 本地编译
+    # 开发模式：优先按源码变更重编译，确保本地 Swift 修改可立即生效。
+    if _is_development_checkout():
+        if _need_recompile():
+            _compile_swift()
+    else:
+        # 发布模式：
+        # 1) 优先使用 wheel 内置预编译二进制
+        # 2) 若不可用，尝试下载
+        # 3) 最后 fallback 本地编译
+        if not _is_bundled_binary() and not _try_download_binary():
             _compile_swift()
 
     # 使用 open 命令启动 .app bundle（macOS 标准方式）

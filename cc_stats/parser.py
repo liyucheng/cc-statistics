@@ -1,4 +1,4 @@
-"""解析 Claude Code JSONL / Gemini CLI JSON 会话文件"""
+"""解析 Claude Code / Codex / Gemini 会话文件"""
 
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ class Session:
     session_id: str
     project_path: str
     file_path: Path
-    source: str = "claude"  # "claude" | "gemini"
+    source: str = "claude"  # "claude" | "codex" | "gemini"
     messages: list[Message] = field(default_factory=list)
 
 
@@ -237,6 +237,487 @@ def find_sessions_by_keyword(keyword: str) -> list[Path]:
     return results
 
 
+# ── Codex 解析 ───────────────────────────────────────────────
+
+_CODEX_TOOL_MAP: dict[str, str] = {
+    "exec_command": "Bash",
+    "write_stdin": "Bash",
+    "read_mcp_resource": "Read",
+    "list_mcp_resources": "ToolSearch",
+    "list_mcp_resource_templates": "ToolSearch",
+    "search_query": "WebSearch",
+    "image_query": "WebSearch",
+    "web.run": "WebSearch",
+    "apply_patch": "Edit",
+}
+
+
+def _to_int(value: Any) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, (int, float)):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(float(value))
+        except ValueError:
+            return 0
+    return 0
+
+
+def _merge_usage(dst: dict[str, Any], src: dict[str, Any]) -> None:
+    for key in (
+        "input_tokens",
+        "output_tokens",
+        "cache_read_input_tokens",
+        "cache_creation_input_tokens",
+    ):
+        dst[key] = _to_int(dst.get(key, 0)) + _to_int(src.get(key, 0))
+
+
+def _extract_codex_text(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return ""
+
+    parts: list[str] = []
+    for block in content:
+        if isinstance(block, str):
+            parts.append(block)
+            continue
+        if not isinstance(block, dict):
+            continue
+        block_type = block.get("type")
+        if block_type in ("text", "input_text", "output_text"):
+            text = block.get("text")
+            if isinstance(text, str):
+                parts.append(text)
+    return "\n".join(parts)
+
+
+def _is_codex_meta_user_text(text: str) -> bool:
+    s = text.lstrip()
+    return (
+        s.startswith("<environment_context>")
+        or s.startswith("<permissions instructions>")
+        or s.startswith("<app-context>")
+    )
+
+
+def _parse_apply_patch_stats(raw_args: Any) -> dict[str, Any]:
+    patch_text = raw_args if isinstance(raw_args, str) else ""
+    if isinstance(raw_args, dict):
+        patch_text = str(raw_args.get("patch") or raw_args.get("input") or "")
+
+    file_path = ""
+    added = 0
+    removed = 0
+    for line in patch_text.splitlines():
+        if not file_path:
+            if line.startswith("*** Update File: "):
+                file_path = line.split(": ", 1)[1].strip()
+            elif line.startswith("*** Add File: "):
+                file_path = line.split(": ", 1)[1].strip()
+            elif line.startswith("*** Delete File: "):
+                file_path = line.split(": ", 1)[1].strip()
+        if line.startswith("+") and not line.startswith("+++"):
+            added += 1
+        elif line.startswith("-") and not line.startswith("---"):
+            removed += 1
+
+    def _dummy_lines(n: int) -> str:
+        return "\n".join(["x"] * n) if n > 0 else ""
+
+    return {
+        "target_file": file_path,
+        "old_string": _dummy_lines(removed),
+        "new_string": _dummy_lines(added),
+    }
+
+
+def _parse_codex_tool_input(tool_name: str, raw_args: Any) -> dict[str, Any]:
+    if tool_name == "apply_patch":
+        return _parse_apply_patch_stats(raw_args)
+
+    if isinstance(raw_args, dict):
+        return raw_args
+    if isinstance(raw_args, str):
+        try:
+            data = json.loads(raw_args)
+            if isinstance(data, dict):
+                return data
+        except json.JSONDecodeError:
+            return {}
+    return {}
+
+
+def _extract_codex_token_usage(payload: dict[str, Any]) -> dict[str, Any]:
+    info = payload.get("info")
+    if not isinstance(info, dict):
+        return {}
+
+    usage = info.get("last_token_usage")
+    if not isinstance(usage, dict):
+        return {}
+
+    raw_input = _to_int(usage.get("input_tokens", 0))
+    cached = _to_int(usage.get("cached_input_tokens", 0))
+    output = _to_int(usage.get("output_tokens", 0))
+
+    if raw_input <= 0 and cached <= 0 and output <= 0:
+        return {}
+
+    # Codex 的 input_tokens 包含 cached_input_tokens，转换为 cc-stats 统一口径：
+    # total = input + output + cache_read + cache_creation
+    input_tokens = max(raw_input - cached, 0)
+    return {
+        "input_tokens": input_tokens,
+        "output_tokens": output,
+        "cache_read_input_tokens": cached,
+        "cache_creation_input_tokens": 0,
+    }
+
+
+def _extract_codex_model(payload: dict[str, Any]) -> str:
+    model = payload.get("model")
+    if isinstance(model, str) and model:
+        return model
+
+    collab = payload.get("collaboration_mode")
+    if isinstance(collab, dict):
+        settings = collab.get("settings")
+        if isinstance(settings, dict):
+            setting_model = settings.get("model")
+            if isinstance(setting_model, str) and setting_model:
+                return setting_model
+
+    return ""
+
+
+def parse_codex_jsonl(path: Path) -> Session:
+    """解析 Codex rollout JSONL 会话文件"""
+    session_id = path.stem
+    project_path = ""
+    messages: list[Message] = []
+    assistant_indices: list[int] = []
+    seen_user: set[tuple[str, str]] = set()
+    seen_assistant: set[tuple[str, str]] = set()
+    last_total_tokens: int | None = None
+    latest_model = ""
+
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+
+            timestamp = obj.get("timestamp", "")
+            obj_type = obj.get("type", "")
+            payload = obj.get("payload", {})
+            if not isinstance(payload, dict):
+                payload = {}
+
+            if obj_type == "session_meta":
+                meta_sid = payload.get("id")
+                if isinstance(meta_sid, str) and meta_sid:
+                    session_id = meta_sid
+                cwd = payload.get("cwd")
+                if isinstance(cwd, str) and cwd:
+                    project_path = cwd
+                model = _extract_codex_model(payload)
+                if model:
+                    latest_model = model
+                continue
+
+            if obj_type == "turn_context":
+                model = _extract_codex_model(payload)
+                if model:
+                    latest_model = model
+                continue
+
+            if obj_type == "event_msg":
+                ev_type = payload.get("type", "")
+
+                if ev_type == "user_message":
+                    text = payload.get("message", "")
+                    if not isinstance(text, str):
+                        continue
+                    key = (timestamp, text)
+                    if key in seen_user:
+                        continue
+                    seen_user.add(key)
+                    messages.append(Message(
+                        role="user",
+                        timestamp=timestamp,
+                        content=text,
+                        session_id=session_id,
+                    ))
+                    continue
+
+                if ev_type == "agent_message":
+                    text = payload.get("message", "")
+                    if not isinstance(text, str):
+                        continue
+                    key = (timestamp, text)
+                    if key in seen_assistant:
+                        continue
+                    seen_assistant.add(key)
+                    messages.append(Message(
+                        role="assistant",
+                        timestamp=timestamp,
+                        content=text,
+                        model=latest_model or None,
+                        session_id=session_id,
+                    ))
+                    assistant_indices.append(len(messages) - 1)
+                    continue
+
+                if ev_type == "token_count":
+                    info = payload.get("info", {})
+                    if isinstance(info, dict):
+                        totals = info.get("total_token_usage", {})
+                        if isinstance(totals, dict):
+                            total_tokens = _to_int(totals.get("total_tokens", 0))
+                            if (
+                                total_tokens > 0
+                                and last_total_tokens is not None
+                                and total_tokens == last_total_tokens
+                            ):
+                                continue
+                            if total_tokens > 0:
+                                last_total_tokens = total_tokens
+
+                    usage = _extract_codex_token_usage(payload)
+                    if not usage:
+                        continue
+                    if assistant_indices:
+                        last_msg = messages[assistant_indices[-1]]
+                        _merge_usage(last_msg.usage, usage)
+                        if not last_msg.model and latest_model:
+                            last_msg.model = latest_model
+                    else:
+                        messages.append(Message(
+                            role="assistant",
+                            timestamp=timestamp,
+                            content="",
+                            usage=usage,
+                            model=latest_model or None,
+                            session_id=session_id,
+                            is_meta=True,
+                        ))
+                        assistant_indices.append(len(messages) - 1)
+                    continue
+
+            if obj_type == "response_item":
+                item_type = payload.get("type", "")
+
+                if item_type == "function_call":
+                    raw_name = payload.get("name", "")
+                    if not isinstance(raw_name, str) or not raw_name:
+                        continue
+                    mapped_name = _CODEX_TOOL_MAP.get(raw_name, raw_name)
+                    args = payload.get("arguments")
+                    tc = ToolCall(
+                        name=mapped_name,
+                        input=_parse_codex_tool_input(raw_name, args),
+                        timestamp=timestamp,
+                        tool_use_id=str(payload.get("call_id", "")),
+                    )
+                    messages.append(Message(
+                        role="assistant",
+                        timestamp=timestamp,
+                        content="",
+                        model=latest_model or None,
+                        tool_calls=[tc],
+                        session_id=session_id,
+                    ))
+                    assistant_indices.append(len(messages) - 1)
+                    continue
+
+                if item_type == "web_search_call":
+                    action = payload.get("action", {})
+                    tc = ToolCall(
+                        name="WebSearch",
+                        input=action if isinstance(action, dict) else {},
+                        timestamp=timestamp,
+                    )
+                    messages.append(Message(
+                        role="assistant",
+                        timestamp=timestamp,
+                        content="",
+                        tool_calls=[tc],
+                        session_id=session_id,
+                    ))
+                    assistant_indices.append(len(messages) - 1)
+                    continue
+
+                if item_type == "message":
+                    role = payload.get("role", "")
+                    content = _extract_codex_text(payload.get("content"))
+                    if not content:
+                        continue
+                    if role == "user":
+                        if _is_codex_meta_user_text(content):
+                            continue
+                        key = (timestamp, content)
+                        if key in seen_user:
+                            continue
+                        seen_user.add(key)
+                        messages.append(Message(
+                            role="user",
+                            timestamp=timestamp,
+                            content=content,
+                            session_id=session_id,
+                        ))
+                    elif role == "assistant":
+                        key = (timestamp, content)
+                        if key in seen_assistant:
+                            continue
+                        seen_assistant.add(key)
+                        messages.append(Message(
+                            role="assistant",
+                            timestamp=timestamp,
+                            content=content,
+                            model=latest_model or None,
+                            session_id=session_id,
+                        ))
+                        assistant_indices.append(len(messages) - 1)
+
+    return Session(
+        session_id=session_id,
+        project_path=project_path,
+        file_path=path,
+        source="codex",
+        messages=messages,
+    )
+
+
+def _looks_like_codex_jsonl(path: Path) -> bool:
+    if path.suffix != ".jsonl":
+        return False
+
+    if (
+        path.name.startswith("rollout-")
+        and "sessions" in path.parts
+        and ".codex" in path.parts
+    ):
+        return True
+
+    try:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                msg_type = obj.get("type", "")
+                if msg_type in ("session_meta", "event_msg", "response_item", "turn_context"):
+                    return True
+                if msg_type in ("user", "assistant"):
+                    return False
+                break
+    except OSError:
+        return False
+
+    return False
+
+
+def _read_codex_session_meta(path: Path) -> dict[str, Any]:
+    try:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if obj.get("type") == "session_meta":
+                    payload = obj.get("payload", {})
+                    return payload if isinstance(payload, dict) else {}
+    except OSError:
+        return {}
+    return {}
+
+
+def find_codex_sessions(project_dir: Path | None = None) -> list[Path]:
+    """查找 ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl 会话文件"""
+    base = Path.home() / ".codex" / "sessions"
+    if not base.exists():
+        return []
+
+    all_files = sorted(base.glob("*/*/*/rollout-*.jsonl"))
+    if project_dir is None:
+        return all_files
+
+    try:
+        target = str(project_dir.expanduser().resolve())
+    except OSError:
+        target = str(project_dir)
+
+    results: list[Path] = []
+    for path in all_files:
+        meta = _read_codex_session_meta(path)
+        cwd = meta.get("cwd", "")
+        if not isinstance(cwd, str) or not cwd:
+            continue
+        try:
+            normalized = str(Path(cwd).expanduser().resolve())
+        except OSError:
+            normalized = cwd
+        if normalized == target:
+            results.append(path)
+    return results
+
+
+def find_codex_sessions_by_keyword(keyword: str) -> list[Path]:
+    """按关键词搜索 Codex 会话（路径/cwd/用户消息内容）"""
+    keyword_lower = keyword.lower()
+    results: list[Path] = []
+
+    for path in find_codex_sessions():
+        if keyword_lower in str(path).lower():
+            results.append(path)
+            continue
+
+        meta = _read_codex_session_meta(path)
+        cwd = meta.get("cwd", "")
+        if isinstance(cwd, str) and cwd and keyword_lower in cwd.lower():
+            results.append(path)
+            continue
+
+        try:
+            with open(path, encoding="utf-8") as f:
+                for line in f:
+                    try:
+                        obj = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if obj.get("type") != "event_msg":
+                        continue
+                    payload = obj.get("payload", {})
+                    if not isinstance(payload, dict):
+                        continue
+                    if payload.get("type") == "user_message":
+                        msg = payload.get("message", "")
+                        if isinstance(msg, str) and keyword_lower in msg.lower():
+                            results.append(path)
+                            break
+        except OSError:
+            continue
+
+    return results
+
+
 # ── Gemini CLI 解析 ──────────────────────────────────────────
 
 # Gemini 工具名映射为 cc-stats 内部统一名称
@@ -383,3 +864,12 @@ def find_gemini_sessions_by_keyword(keyword: str) -> list[Path]:
             continue
 
     return results
+
+
+def parse_session_file(path: Path) -> Session:
+    """自动识别并解析会话文件（Claude / Codex / Gemini）"""
+    if path.suffix == ".json":
+        return parse_gemini_json(path)
+    if _looks_like_codex_jsonl(path):
+        return parse_codex_jsonl(path)
+    return parse_jsonl(path)

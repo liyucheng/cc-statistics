@@ -6,8 +6,13 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from .analyzer import SessionStats, TokenUsage, merge_stats, analyze_session
-from .parser import find_gemini_sessions, find_sessions, parse_gemini_json, parse_jsonl
+from .analyzer import SessionStats, TokenUsage, analyze_session, merge_stats
+from .parser import (
+    find_codex_sessions,
+    find_gemini_sessions,
+    find_sessions,
+    parse_session_file,
+)
 
 # 模型定价 ($/M tokens)
 _PRICING = {
@@ -128,10 +133,11 @@ def generate_report(period: str = "week") -> str:
     start_str = since.astimezone().strftime("%Y-%m-%d")
     end_str = now.astimezone().strftime("%Y-%m-%d")
 
-    # 收集所有会话（Claude + Gemini）
+    # 收集所有会话（Claude + Codex + Gemini）
     session_files: list[Path] = [
         f for f in find_sessions() if not f.name.startswith("agent-")
     ]
+    session_files.extend(find_codex_sessions())
     session_files.extend(find_gemini_sessions())
     session_files.sort(key=lambda f: f.stat().st_mtime)
 
@@ -140,7 +146,7 @@ def generate_report(period: str = "week") -> str:
 
     for f in session_files:
         try:
-            session = parse_gemini_json(f) if f.suffix == ".json" else parse_jsonl(f)
+            session = parse_session_file(f)
             stats = analyze_session(session)
             if stats.end_time and stats.end_time < since:
                 continue
@@ -287,7 +293,7 @@ def generate_report(period: str = "week") -> str:
     prev_stats: list[SessionStats] = []
     for f in session_files:
         try:
-            session = parse_gemini_json(f) if f.suffix == ".json" else parse_jsonl(f)
+            session = parse_session_file(f)
             stats_item = analyze_session(session)
             if stats_item.end_time and prev_since <= stats_item.end_time < since:
                 prev_stats.append(stats_item)

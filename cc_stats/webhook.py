@@ -5,27 +5,32 @@ from __future__ import annotations
 import json
 import urllib.request
 import urllib.error
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
+from datetime import datetime, timezone
 
 from .analyzer import SessionStats, analyze_session, merge_stats
-from .parser import find_gemini_sessions, find_sessions, parse_gemini_json, parse_jsonl
+from .parser import (
+    find_codex_sessions,
+    find_gemini_sessions,
+    find_sessions,
+    parse_session_file,
+)
 
 
 def _collect_today_stats() -> SessionStats | None:
-    """收集今天的统计数据（Claude + Gemini）
+    """收集今天的统计数据（Claude + Codex + Gemini）
 
     使用 token_by_date 按消息时间戳归日：只要 session 中有消息
     落在今天，该 session 就会被纳入统计。
     """
     today_key = datetime.now().strftime("%Y-%m-%d")
     all_files: list = list(find_sessions())
+    all_files.extend(find_codex_sessions())
     all_files.extend(find_gemini_sessions())
     today_stats = []
 
     for f in all_files:
         try:
-            session = parse_gemini_json(f) if f.suffix == ".json" else parse_jsonl(f)
+            session = parse_session_file(f)
             stats = analyze_session(session)
             # 按消息时间戳归日：token_by_date 包含今天的 key
             has_today_tokens = today_key in stats.token_by_date

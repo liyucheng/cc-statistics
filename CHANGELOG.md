@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.12.16 (2026-04-16)
+
+### Bug Fixes
+- Add Codex sessions support for `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` in CLI/reporter/export/webhook
+- Fix Codex parser token attribution and dedup of cumulative `token_count` events
+- Fix Codex model attribution from `turn_context.payload.model` (avoid `unknown` model in token breakdown)
+- Fix macOS app startup behavior in editable/development mode to recompile Swift sources when changed
+- Fix macOS app Codex parser field mapping so Codex token usage is displayed correctly
+
 ## v0.12.4 (2026-03-29)
 
 ### Bug Fixes

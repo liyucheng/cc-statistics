@@ -8,10 +8,10 @@ from pathlib import Path
 from .parser import (
     Message,
     Session,
+    find_codex_sessions,
     find_gemini_sessions,
     find_sessions,
-    parse_gemini_json,
-    parse_jsonl,
+    parse_session_file,
 )
 
 
@@ -120,8 +120,9 @@ def find_and_export(keyword: str, output: str | None = None,
         output: 输出文件路径（None 则输出到 stdout）
         include_tools: 是否包含工具调用
     """
-    # 搜索所有会话（Claude + Gemini）
+    # 搜索所有会话（Claude + Codex + Gemini）
     all_files: list[Path] = list(find_sessions())
+    all_files.extend(find_codex_sessions())
     all_files.extend(find_gemini_sessions())
 
     # 先按 session ID 前缀匹配
@@ -135,9 +136,7 @@ def find_and_export(keyword: str, output: str | None = None,
     if not matched:
         for f in sorted(all_files, key=lambda p: p.stat().st_mtime, reverse=True):
             try:
-                session = (
-                    parse_gemini_json(f) if f.suffix == ".json" else parse_jsonl(f)
-                )
+                session = parse_session_file(f)
                 for msg in session.messages:
                     text = _extract_text(msg.content)
                     if keyword.lower() in text.lower():
@@ -151,9 +150,7 @@ def find_and_export(keyword: str, output: str | None = None,
     if not matched:
         return None
 
-    session = (
-        parse_gemini_json(matched) if matched.suffix == ".json" else parse_jsonl(matched)
-    )
+    session = parse_session_file(matched)
     md = export_session(session, include_tools=include_tools)
 
     if output:

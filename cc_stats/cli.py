@@ -11,20 +11,19 @@ from pathlib import Path
 from .analyzer import SessionStats, TokenUsage, analyze_session, merge_stats
 from .formatter import format_skill_stats, format_stats
 from .parser import (
+    find_codex_sessions,
+    find_codex_sessions_by_keyword,
     find_gemini_sessions,
     find_gemini_sessions_by_keyword,
     find_sessions,
     find_sessions_by_keyword,
-    parse_gemini_json,
-    parse_jsonl,
+    parse_session_file,
 )
 
 
 def _parse_session(path: Path):
     """根据文件类型选择解析器"""
-    if path.suffix == ".json":
-        return parse_gemini_json(path)
-    return parse_jsonl(path)
+    return parse_session_file(path)
 
 
 def _parse_time_arg(value: str, *, as_end_of_day: bool = False) -> datetime:
@@ -252,7 +251,7 @@ def _compare_projects(args) -> None:
 
 
 def _list_projects() -> None:
-    """列出所有已知项目（Claude + Gemini）"""
+    """列出所有已知项目（Claude + Codex + Gemini）"""
     has_any = False
 
     # Claude 项目
@@ -270,6 +269,26 @@ def _list_projects() -> None:
             print(f"  {display_name}  ({len(jsonl_files)} 个会话)")
             has_any = True
 
+    # Codex 项目
+    codex_sessions = find_codex_sessions()
+    if codex_sessions:
+        from collections import defaultdict
+        codex_by_dir: dict[str, list[Path]] = defaultdict(list)
+        for cf in codex_sessions:
+            try:
+                session = _parse_session(cf)
+                key = session.project_path or "Unknown"
+            except Exception:
+                key = "Unknown"
+            codex_by_dir[key].append(cf)
+
+        print("\n可用项目 (Codex):")
+        print("─" * 60)
+        for name, files in sorted(codex_by_dir.items()):
+            display = Path(name).name if "/" in name else name
+            print(f"  {display}  ({len(files)} 个会话)")
+            has_any = True
+
     # Gemini 项目
     gemini_sessions = find_gemini_sessions()
     if gemini_sessions:
@@ -278,7 +297,7 @@ def _list_projects() -> None:
         gemini_by_dir: dict[str, list[Path]] = defaultdict(list)
         for gf in gemini_sessions:
             try:
-                session = parse_gemini_json(gf)
+                session = _parse_session(gf)
                 key = session.project_path or gf.parent.parent.name
             except Exception:
                 key = gf.parent.parent.name
@@ -328,8 +347,9 @@ def _show_rate_limit(args) -> None:
     from .formatter import format_rate_limit
     from .rate_limiter import analyze_rate_limit
 
-    # 收集所有会话文件（Claude + Gemini）
+    # 收集所有会话文件（Claude + Codex + Gemini）
     session_files: list[Path] = find_sessions()
+    session_files.extend(find_codex_sessions())
     session_files.extend(find_gemini_sessions())
 
     if not session_files:
@@ -381,6 +401,7 @@ def _show_git_integration(args) -> None:
 
     # 收集所有会话文件
     session_files: list[Path] = find_sessions()
+    session_files.extend(find_codex_sessions())
     session_files.extend(find_gemini_sessions())
 
     if not session_files:
@@ -426,7 +447,7 @@ def main(argv: list[str] | None = None) -> None:
 
     parser = argparse.ArgumentParser(
         prog="cc-stats",
-        description="AI Coding 会话统计工具 — 支持 Claude Code / Gemini CLI",
+        description="AI Coding 会话统计工具 — 支持 Claude Code / Codex / Gemini CLI",
     )
     parser.add_argument(
         "path",
@@ -619,7 +640,7 @@ def main(argv: list[str] | None = None) -> None:
         _list_projects()
         return
 
-    # 确定要分析的会话文件（Claude JSONL + Gemini JSON）
+    # 确定要分析的会话文件（Claude JSONL + Codex JSONL + Gemini JSON）
     session_files: list[Path] = []
 
     if args.path:
@@ -628,19 +649,26 @@ def main(argv: list[str] | None = None) -> None:
             session_files = [p]
         elif p.is_dir():
             session_files = find_sessions(p)
+            session_files.extend(find_codex_sessions(p))
         if not session_files:
-            # 作为关键词模糊搜索（Claude + Gemini）
+            # 作为关键词模糊搜索（Claude + Codex + Gemini）
             session_files = find_sessions_by_keyword(args.path)
+            session_files.extend(find_codex_sessions_by_keyword(args.path))
             session_files.extend(find_gemini_sessions_by_keyword(args.path))
         if not session_files:
             print(f"找不到: {args.path}", file=sys.stderr)
             sys.exit(1)
     elif args.all:
         session_files = find_sessions()
+        session_files.extend(find_codex_sessions())
         session_files.extend(find_gemini_sessions())
     else:
         # 默认：当前目录
         session_files = find_sessions(Path.cwd())
+        session_files.extend(find_codex_sessions(Path.cwd()))
+
+    # 去重（保留原顺序）
+    session_files = list(dict.fromkeys(session_files))
 
     if not session_files:
         print("未找到会话文件。使用 --list 查看可用项目。", file=sys.stderr)
