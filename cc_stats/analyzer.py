@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from .parser import Message, Session, ToolCall
+from .pricing import is_claude_model, match_model_pricing
 
 # 文件扩展名 → 语言映射
 EXT_TO_LANG: dict[str, str] = {
@@ -229,15 +230,6 @@ class SessionStats:
     work_mode_distribution: dict[str, int] = field(default_factory=dict)
 
 
-# Claude 模型定价 (USD per 1M tokens)
-# https://docs.anthropic.com/en/docs/about-claude/models
-CLAUDE_INPUT_PRICE = 3.0       # $3/1M input tokens (Sonnet baseline)
-CLAUDE_CACHE_READ_PRICE = 0.30  # $0.30/1M cache read tokens (90% cheaper)
-
-# Gemini 定价差异较大且缓存机制不同，标注 N/A
-GEMINI_MODEL_PREFIXES = ("gemini",)
-
-
 @dataclass
 class CacheStats:
     """缓存命中率分析结果"""
@@ -277,13 +269,15 @@ def compute_cache_stats(
     hit_rate = cache_read / total_input if total_input > 0 else 0.0
     grade, grade_label = _cache_grade(hit_rate)
 
-    # 节省费用估算：仅对 Claude 模型计算
+    # 节省费用估算：仅对 Claude 模型计算（按实际模型价差）
     # savings = cache_read_tokens * (input_price - cache_read_price) / 1M
-    claude_cache_read = 0
+    savings_usd = 0.0
     for model, usage in token_by_model.items():
-        if not model.lower().startswith(GEMINI_MODEL_PREFIXES):
-            claude_cache_read += usage.cache_read_input_tokens
-    savings_usd = claude_cache_read * (CLAUDE_INPUT_PRICE - CLAUDE_CACHE_READ_PRICE) / 1_000_000
+        if not is_claude_model(model):
+            continue
+        pricing = match_model_pricing(model)
+        savings_per_million = pricing["input"] - pricing["cache_read"]
+        savings_usd += usage.cache_read_input_tokens * savings_per_million / 1_000_000
 
     # 按模型拆分命中率
     by_model: dict[str, float] = {}

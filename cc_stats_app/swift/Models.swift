@@ -449,24 +449,31 @@ struct ModelPricing {
 
 enum CostEstimator {
     private static let pricing: [String: ModelPricing] = [
-        // Claude — Opus 4.5/4.6 standard ($5/$25), Opus 4/4.1 legacy ($15/$75), fast mode ($30/$150)
-        "opus-4.5": ModelPricing(inputPerMillion: 5, outputPerMillion: 25, cacheReadPerMillion: 0.5, cacheCreatePerMillion: 6.25),
-        "opus-4.6": ModelPricing(inputPerMillion: 5, outputPerMillion: 25, cacheReadPerMillion: 0.5, cacheCreatePerMillion: 6.25),
-        "opus-fast": ModelPricing(inputPerMillion: 30, outputPerMillion: 150, cacheReadPerMillion: 3, cacheCreatePerMillion: 37.5),
-        "opus": ModelPricing(inputPerMillion: 15, outputPerMillion: 75, cacheReadPerMillion: 1.5, cacheCreatePerMillion: 18.75),
-        "sonnet": ModelPricing(inputPerMillion: 3, outputPerMillion: 15, cacheReadPerMillion: 0.3, cacheCreatePerMillion: 3.75),
-        "haiku-4.5": ModelPricing(inputPerMillion: 1, outputPerMillion: 5, cacheReadPerMillion: 0.1, cacheCreatePerMillion: 1.25),
-        "haiku": ModelPricing(inputPerMillion: 0.8, outputPerMillion: 4, cacheReadPerMillion: 0.08, cacheCreatePerMillion: 1.0),
-        // OpenAI
-        "gpt-4o": ModelPricing(inputPerMillion: 2.5, outputPerMillion: 10, cacheReadPerMillion: 1.25, cacheCreatePerMillion: 2.5),
-        "gpt-4o-mini": ModelPricing(inputPerMillion: 0.15, outputPerMillion: 0.6, cacheReadPerMillion: 0.075, cacheCreatePerMillion: 0.15),
-        "o1": ModelPricing(inputPerMillion: 15, outputPerMillion: 60, cacheReadPerMillion: 7.5, cacheCreatePerMillion: 15),
-        "o3": ModelPricing(inputPerMillion: 10, outputPerMillion: 40, cacheReadPerMillion: 2.5, cacheCreatePerMillion: 10),
-        "o3-mini": ModelPricing(inputPerMillion: 1.1, outputPerMillion: 4.4, cacheReadPerMillion: 0.55, cacheCreatePerMillion: 1.1),
-        "o4-mini": ModelPricing(inputPerMillion: 1.1, outputPerMillion: 4.4, cacheReadPerMillion: 0.55, cacheCreatePerMillion: 1.1),
+        // Claude
+        "claude-opus-4.6": ModelPricing(inputPerMillion: 5.0, outputPerMillion: 25.0, cacheReadPerMillion: 0.5, cacheCreatePerMillion: 6.25),
+        "claude-opus-4.5": ModelPricing(inputPerMillion: 5.0, outputPerMillion: 25.0, cacheReadPerMillion: 0.5, cacheCreatePerMillion: 6.25),
+        "claude-opus-4.1": ModelPricing(inputPerMillion: 15.0, outputPerMillion: 75.0, cacheReadPerMillion: 1.5, cacheCreatePerMillion: 18.75),
+        "claude-sonnet-4.6": ModelPricing(inputPerMillion: 3.0, outputPerMillion: 15.0, cacheReadPerMillion: 0.3, cacheCreatePerMillion: 3.75),
+        "claude-sonnet-4.5": ModelPricing(inputPerMillion: 3.0, outputPerMillion: 15.0, cacheReadPerMillion: 0.3, cacheCreatePerMillion: 3.75),
+        "claude-sonnet-4": ModelPricing(inputPerMillion: 3.0, outputPerMillion: 15.0, cacheReadPerMillion: 0.3, cacheCreatePerMillion: 3.75),
+        "claude-haiku-4.5": ModelPricing(inputPerMillion: 1.0, outputPerMillion: 5.0, cacheReadPerMillion: 0.1, cacheCreatePerMillion: 1.25),
+        "claude-haiku-legacy": ModelPricing(inputPerMillion: 0.8, outputPerMillion: 4.0, cacheReadPerMillion: 0.08, cacheCreatePerMillion: 1.0),
+        // OpenAI / Codex
+        "gpt-5.4": ModelPricing(inputPerMillion: 2.50, outputPerMillion: 15.00, cacheReadPerMillion: 0.25, cacheCreatePerMillion: 2.50),
+        "gpt-5.4-mini": ModelPricing(inputPerMillion: 0.75, outputPerMillion: 4.50, cacheReadPerMillion: 0.075, cacheCreatePerMillion: 0.75),
+        "gpt-5.4-nano": ModelPricing(inputPerMillion: 0.20, outputPerMillion: 1.25, cacheReadPerMillion: 0.020, cacheCreatePerMillion: 0.20),
+        "gpt-5.3-codex": ModelPricing(inputPerMillion: 1.75, outputPerMillion: 14.00, cacheReadPerMillion: 0.175, cacheCreatePerMillion: 1.75),
+        "gpt-5.3-chat-latest": ModelPricing(inputPerMillion: 1.75, outputPerMillion: 14.00, cacheReadPerMillion: 0.175, cacheCreatePerMillion: 1.75),
+        "gpt-4o": ModelPricing(inputPerMillion: 2.50, outputPerMillion: 10.00, cacheReadPerMillion: 1.25, cacheCreatePerMillion: 2.50),
+        "gpt-4o-mini": ModelPricing(inputPerMillion: 0.15, outputPerMillion: 0.60, cacheReadPerMillion: 0.075, cacheCreatePerMillion: 0.15),
+        "o1": ModelPricing(inputPerMillion: 15.00, outputPerMillion: 60.00, cacheReadPerMillion: 7.5, cacheCreatePerMillion: 15.0),
+        "o3": ModelPricing(inputPerMillion: 10.00, outputPerMillion: 40.00, cacheReadPerMillion: 2.5, cacheCreatePerMillion: 10.0),
+        "o3-mini": ModelPricing(inputPerMillion: 1.10, outputPerMillion: 4.40, cacheReadPerMillion: 0.55, cacheCreatePerMillion: 1.10),
+        "o4-mini": ModelPricing(inputPerMillion: 1.10, outputPerMillion: 4.40, cacheReadPerMillion: 0.55, cacheCreatePerMillion: 1.10),
         // Gemini
-        "gemini-2.5-pro": ModelPricing(inputPerMillion: 1.25, outputPerMillion: 10, cacheReadPerMillion: 0.31, cacheCreatePerMillion: 1.25),
-        "gemini-2.5-flash": ModelPricing(inputPerMillion: 0.15, outputPerMillion: 0.60, cacheReadPerMillion: 0.04, cacheCreatePerMillion: 0.15),
+        "gemini-2.5-pro": ModelPricing(inputPerMillion: 1.25, outputPerMillion: 10.00, cacheReadPerMillion: 0.125, cacheCreatePerMillion: 1.25),
+        "gemini-2.5-flash": ModelPricing(inputPerMillion: 0.30, outputPerMillion: 2.50, cacheReadPerMillion: 0.03, cacheCreatePerMillion: 0.30),
+        "gemini-2.5-flash-lite": ModelPricing(inputPerMillion: 0.10, outputPerMillion: 0.40, cacheReadPerMillion: 0.01, cacheCreatePerMillion: 0.10),
         "gemini-2.0-flash": ModelPricing(inputPerMillion: 0.10, outputPerMillion: 0.40, cacheReadPerMillion: 0.025, cacheCreatePerMillion: 0.10),
     ]
 
@@ -494,35 +501,59 @@ enum CostEstimator {
 
     private static func matchPricing(_ model: String) -> ModelPricing {
         let lower = model.lowercased()
-        // Gemini models (check first — more specific names)
-        if lower.contains("gemini-2.5-pro") { return pricing["gemini-2.5-pro"]! }
-        if lower.contains("gemini-2.5-flash") { return pricing["gemini-2.5-flash"]! }
-        if lower.contains("gemini-2.0-flash") { return pricing["gemini-2.0-flash"]! }
-        if lower.contains("gemini") { return pricing["gemini-2.5-flash"]! }
-        // Claude models (specific versions first, then fallback)
-        if lower.contains("opus") {
-            if lower.contains("4.5") || lower.contains("4.6") || lower.contains("4-6") || lower.contains("4-5") {
-                // Opus 4.5/4.6 standard mode is $5/$25
-                return pricing["opus-4.6"]!
-            }
-            return pricing["opus"]!  // Legacy Opus 4/4.1: $15/$75
-        }
-        if lower.contains("haiku") {
-            if lower.contains("4.5") || lower.contains("4-5") {
-                return pricing["haiku-4.5"]!
-            }
-            return pricing["haiku"]!
-        }
-        if lower.contains("sonnet") { return pricing["sonnet"]! }
-        // OpenAI models
+        // OpenAI / Codex
+        if lower.contains("gpt-5.4-mini") { return pricing["gpt-5.4-mini"]! }
+        if lower.contains("gpt-5.4-nano") { return pricing["gpt-5.4-nano"]! }
+        if lower.contains("gpt-5.4") { return pricing["gpt-5.4"]! }
+        if lower.contains("gpt-5.3-chat-latest") { return pricing["gpt-5.3-chat-latest"]! }
+        if lower.contains("gpt-5.3-codex") { return pricing["gpt-5.3-codex"]! }
+        if lower.contains("gpt-5") && lower.contains("codex") { return pricing["gpt-5.3-codex"]! }
+        if lower.contains("gpt-4o-mini") { return pricing["gpt-4o-mini"]! }
+        if lower.contains("gpt-4o") { return pricing["gpt-4o"]! }
         if lower.contains("o4-mini") { return pricing["o4-mini"]! }
         if lower.contains("o3-mini") { return pricing["o3-mini"]! }
         if lower.contains("o3") { return pricing["o3"]! }
         if lower.contains("o1") { return pricing["o1"]! }
-        if lower.contains("gpt-4o-mini") { return pricing["gpt-4o-mini"]! }
-        if lower.contains("gpt-4o") { return pricing["gpt-4o"]! }
-        // Default to sonnet pricing for unknown
-        return pricing["sonnet"]!
+
+        // Gemini
+        if lower.contains("gemini-2.5-pro") { return pricing["gemini-2.5-pro"]! }
+        if lower.contains("gemini-2.5-flash-lite") { return pricing["gemini-2.5-flash-lite"]! }
+        if lower.contains("gemini-2.5-flash") { return pricing["gemini-2.5-flash"]! }
+        if lower.contains("gemini-2.0-flash") { return pricing["gemini-2.0-flash"]! }
+        if lower.contains("gemini") { return pricing["gemini-2.5-flash"]! }
+
+        // Claude
+        if lower.contains("opus") {
+            if lower.contains("4.6") || lower.contains("4-6") {
+                return pricing["claude-opus-4.6"]!
+            }
+            if lower.contains("4.5") || lower.contains("4-5") {
+                return pricing["claude-opus-4.5"]!
+            }
+            return pricing["claude-opus-4.1"]!
+        }
+        if lower.contains("haiku") {
+            if lower.contains("4.5") || lower.contains("4-5") {
+                return pricing["claude-haiku-4.5"]!
+            }
+            return pricing["claude-haiku-legacy"]!
+        }
+        if lower.contains("sonnet") {
+            if lower.contains("4.6") || lower.contains("4-6") {
+                return pricing["claude-sonnet-4.6"]!
+            }
+            if lower.contains("4.5") || lower.contains("4-5") {
+                return pricing["claude-sonnet-4.5"]!
+            }
+            return pricing["claude-sonnet-4"]!
+        }
+
+        // Vendor fallback for unknown model strings
+        if lower.contains("gpt") || lower.hasPrefix("o1") || lower.hasPrefix("o3") || lower.hasPrefix("o4") {
+            return pricing["gpt-5.3-codex"]!
+        }
+        if lower.contains("gemini") { return pricing["gemini-2.5-flash"]! }
+        return pricing["claude-sonnet-4.6"]!
     }
 
     static func formatCost(_ cost: Double) -> String {

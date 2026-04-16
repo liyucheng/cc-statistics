@@ -13,44 +13,19 @@ from .parser import (
     find_sessions,
     parse_session_file,
 )
-
-# 模型定价 ($/M tokens)
-_PRICING = {
-    "opus": {"input": 15, "output": 75, "cache_read": 1.5, "cache_create": 18.75},
-    "sonnet": {"input": 3, "output": 15, "cache_read": 0.3, "cache_create": 3.75},
-    "haiku": {"input": 0.8, "output": 4, "cache_read": 0.08, "cache_create": 1.0},
-    # Gemini 模型定价
-    "gemini-2.5-pro": {"input": 1.25, "output": 10, "cache_read": 0.31, "cache_create": 1.25},
-    "gemini-2.5-flash": {"input": 0.15, "output": 0.60, "cache_read": 0.04, "cache_create": 0.15},
-    "gemini-2.0-flash": {"input": 0.10, "output": 0.40, "cache_read": 0.025, "cache_create": 0.10},
-}
+from .pricing import (
+    Pricing,
+    estimate_cost_from_token_by_model,
+    match_model_pricing,
+)
 
 
-def _match_pricing(model: str) -> dict:
-    lower = model.lower()
-    # Gemini 模型：精确匹配
-    for key in ("gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"):
-        if key in lower:
-            return _PRICING[key]
-    # Claude 模型：关键词匹配
-    for key in ["opus", "haiku", "sonnet"]:
-        if key in lower:
-            return _PRICING[key]
-    # 默认按 Sonnet 估算
-    if "gemini" in lower:
-        return _PRICING["gemini-2.5-flash"]
-    return _PRICING["sonnet"]
+def _match_pricing(model: str) -> Pricing:
+    return match_model_pricing(model)
 
 
 def _estimate_cost(stats: SessionStats) -> float:
-    cost = 0.0
-    for model, usage in stats.token_by_model.items():
-        p = _match_pricing(model)
-        cost += usage.input_tokens / 1e6 * p["input"]
-        cost += usage.output_tokens / 1e6 * p["output"]
-        cost += usage.cache_read_input_tokens / 1e6 * p["cache_read"]
-        cost += usage.cache_creation_input_tokens / 1e6 * p["cache_create"]
-    return cost
+    return estimate_cost_from_token_by_model(stats.token_by_model)
 
 
 def _fmt_duration(td: timedelta) -> str:

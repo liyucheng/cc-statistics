@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.12.18 (2026-04-16)
+
+### Pricing
+- Recalibrate model pricing with latest official rates for OpenAI, Claude, and Gemini
+- Add dedicated pricing matcher for Codex/OpenAI model families (including `gpt-5.3-codex`)
+- Unify Python-side cost estimation across reporter/webhook/hooks to avoid drift
+
+### Accuracy
+- Improve Claude cache savings estimation by using per-model input vs cache-read price delta
+- Keep app-side Swift pricing map aligned with CLI/backend pricing behavior
+
 ## v0.12.17 (2026-04-16)
 
 ### Performance

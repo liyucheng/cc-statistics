@@ -102,13 +102,13 @@ def _quick_session_stats(session_id: str) -> dict[str, Any] | None:
     try:
         from .parser import parse_jsonl
         from .analyzer import analyze_session
+        from .pricing import estimate_cost_from_token_by_model
 
         session = parse_jsonl(target_file)
         stats = analyze_session(session)
 
         total_tokens = stats.token_usage.total
-        # 快速费用估算
-        cost = total_tokens / 1e6 * 10  # 粗略估算
+        cost = estimate_cost_from_token_by_model(stats.token_by_model)
         duration = stats.active_duration.total_seconds()
 
         return {
