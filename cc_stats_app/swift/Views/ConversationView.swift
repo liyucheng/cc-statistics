@@ -1,5 +1,60 @@
 import SwiftUI
 import AppKit
+import WebKit
+
+private enum ShareExportPreset: String, CaseIterable, Identifiable {
+    case balanced
+    case x
+    case linkedIn
+    case slack
+    case telegram
+
+    var id: String { rawValue }
+
+    var cardWidth: CGFloat {
+        switch self {
+        case .balanced: return 680
+        case .x: return 540
+        case .linkedIn: return 720
+        case .slack: return 760
+        case .telegram: return 800
+        }
+    }
+
+    var scale: CGFloat {
+        switch self {
+        case .balanced: return 2.5
+        case .x, .linkedIn, .slack, .telegram: return 2.0
+        }
+    }
+
+    var maxPagePixelHeight: Int {
+        switch self {
+        case .balanced: return 2200
+        case .x: return 1350
+        case .linkedIn: return 1800
+        case .slack: return 2400
+        case .telegram: return 3000
+        }
+    }
+
+    var slug: String { rawValue.lowercased() }
+
+    var label: String {
+        switch self {
+        case .balanced:
+            return L10n.isChinese ? "通用高清" : "Balanced"
+        case .x:
+            return "X"
+        case .linkedIn:
+            return "LinkedIn"
+        case .slack:
+            return "Slack"
+        case .telegram:
+            return "Telegram"
+        }
+    }
+}
 
 // MARK: - ConversationView
 
@@ -12,6 +67,8 @@ struct ConversationView: View {
     @State private var searchText: String = ""
     @State private var isSelectMode = false
     @State private var selectedMessageIDs: Set<UUID> = []
+    @State private var sharePreset: ShareExportPreset = .balanced
+    @State private var isExportingShare = false
     private var sessions: [Session] { viewModel.conversationSessions }
     private var isLoading: Bool { viewModel.isConversationLoading }
 
@@ -287,6 +344,36 @@ struct ConversationView: View {
 
                 // Select / Share buttons
                 if isSelectMode {
+                    Menu {
+                        ForEach(ShareExportPreset.allCases) { preset in
+                            Button {
+                                sharePreset = preset
+                            } label: {
+                                HStack {
+                                    Text(preset.label)
+                                    if sharePreset == preset {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "slider.horizontal.3")
+                                .font(.system(size: 9))
+                            Text(sharePreset.label)
+                                .font(.system(size: 10, weight: .medium))
+                        }
+                        .foregroundColor(Theme.textSecondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .fill(Theme.cardBackground)
+                        )
+                    }
+                    .buttonStyle(.plain)
+
                     Button {
                         shareSelectedMessages(session: session)
                     } label: {
@@ -305,7 +392,27 @@ struct ConversationView: View {
                         )
                     }
                     .buttonStyle(.plain)
-                    .disabled(selectedMessageIDs.isEmpty)
+                    .disabled(selectedMessageIDs.isEmpty || isExportingShare)
+
+                    Button {
+                        exportSelectedMessagesPDF(session: session)
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "doc.richtext")
+                                .font(.system(size: 9))
+                            Text("PDF")
+                                .font(.system(size: 10, weight: .semibold))
+                        }
+                        .foregroundColor(selectedMessageIDs.isEmpty ? Theme.textTertiary : Theme.green)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .fill(selectedMessageIDs.isEmpty ? Theme.cardBackground : Theme.green.opacity(0.12))
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(selectedMessageIDs.isEmpty || isExportingShare)
 
                     Button {
                         isSelectMode = false
@@ -422,73 +529,340 @@ struct ConversationView: View {
     private func shareSelectedMessages(session: Session) {
         let selected = session.messages.filter { selectedMessageIDs.contains($0.id) }
         guard !selected.isEmpty else { return }
+        Task { await exportSelectedMessages(session: session, selectedMessages: selected, asPDF: false) }
+    }
 
-        // 构建分享卡片视图
-        let cardView = ShareCardView(
-            messages: selected,
-            projectName: session.projectPath.map { URL(fileURLWithPath: $0).lastPathComponent } ?? "",
-            startTime: session.startTime
+    private func exportSelectedMessagesPDF(session: Session) {
+        let selected = session.messages.filter { selectedMessageIDs.contains($0.id) }
+        guard !selected.isEmpty else { return }
+        Task { await exportSelectedMessages(session: session, selectedMessages: selected, asPDF: true) }
+    }
+
+    private func exportSelectedMessages(
+        session: Session,
+        selectedMessages: [Message],
+        asPDF: Bool
+    ) async {
+        guard !isExportingShare else { return }
+        isExportingShare = true
+        defer { isExportingShare = false }
+
+        let projectName = session.projectPath.map { URL(fileURLWithPath: $0).lastPathComponent } ?? ""
+        let html = buildShareHTML(
+            messages: selectedMessages,
+            projectName: projectName,
+            startTime: session.startTime,
+            preset: sharePreset
         )
 
-        // 渲染为高清图片 (3x)
-        let scale: CGFloat = 3.0
-        let cardWidth: CGFloat = 520
-        let hostingView = NSHostingView(rootView: cardView.frame(width: cardWidth))
-        hostingView.frame = NSRect(x: 0, y: 0, width: cardWidth, height: 10000)
+        let renderer = HTMLShareRenderer(
+            viewportWidth: max(360, Int(sharePreset.cardWidth)),
+            scale: sharePreset.scale
+        )
 
-        // 计算实际内容高度
-        let fittingSize = hostingView.fittingSize
-        hostingView.frame = NSRect(x: 0, y: 0, width: cardWidth, height: fittingSize.height)
+        do {
+            try await renderer.load(html: html)
+            let stamp = shareFileStamp()
+            let desktop = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Desktop")
 
-        let pixelWidth = Int(cardWidth * scale)
-        let pixelHeight = Int(fittingSize.height * scale)
+            if asPDF {
+                let pdfData = try await renderer.renderPDFData()
+                let fileName = "chat-share-\(selectedMessages.count)msgs-\(sharePreset.slug)-\(stamp).pdf"
+                let filePath = desktop.appendingPathComponent(fileName)
+                try pdfData.write(to: filePath, options: .atomic)
+                isSelectMode = false
+                selectedMessageIDs.removeAll()
+                NSWorkspace.shared.open(filePath)
+                showShareToast(L10n.isChinese ? "已导出清晰 PDF" : "Exported PDF")
+                return
+            }
 
-        guard let bitmapRep = NSBitmapImageRep(
-            bitmapDataPlanes: nil,
-            pixelsWide: pixelWidth,
-            pixelsHigh: pixelHeight,
-            bitsPerSample: 8,
-            samplesPerPixel: 4,
-            hasAlpha: true,
-            isPlanar: false,
-            colorSpaceName: .deviceRGB,
-            bytesPerRow: 0,
-            bitsPerPixel: 0
-        ) else { return }
+            let pages = try await renderer.renderPNGPages(maxPageHeight: sharePreset.maxPagePixelHeight)
+            guard !pages.isEmpty else {
+                showShareToast(L10n.isChinese ? "导出失败，请重试" : "Export failed")
+                return
+            }
 
-        // 不设置 bitmapRep.size — 保持默认值(=像素尺寸)，隐含 1x DPI
-        // scaleBy(3) 将 520pt hostingView.bounds 映射到 1560px，刚好填满 bitmap
+            var outputURLs: [URL] = []
+            for (index, pngData) in pages.enumerated() {
+                let pageSuffix = pages.count > 1 ? "-p\(index + 1)" : ""
+                let fileName = "chat-share-\(selectedMessages.count)msgs-\(sharePreset.slug)-\(stamp)\(pageSuffix).png"
+                let filePath = desktop.appendingPathComponent(fileName)
+                try pngData.write(to: filePath, options: .atomic)
+                outputURLs.append(filePath)
+            }
 
-        NSGraphicsContext.saveGraphicsState()
-        guard let ctx = NSGraphicsContext(bitmapImageRep: bitmapRep) else {
-            NSGraphicsContext.restoreGraphicsState()
-            return
+            if let first = pages.first {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setData(first, forType: .png)
+            }
+
+            isSelectMode = false
+            selectedMessageIDs.removeAll()
+
+            if let firstURL = outputURLs.first {
+                NSWorkspace.shared.open(firstURL)
+            }
+
+            let msg = pages.count > 1
+                ? (L10n.isChinese ? "已导出 \(pages.count) 张高清图片并复制第一页" : "Exported \(pages.count) HD images")
+                : (L10n.isChinese ? "已导出高清图片并复制到剪贴板" : "Exported HD image")
+            showShareToast(msg)
+        } catch {
+            showShareToast(L10n.isChinese ? "导出失败，请重试" : "Export failed")
         }
-        NSGraphicsContext.current = ctx
-        ctx.cgContext.scaleBy(x: scale, y: scale)
-        hostingView.displayIgnoringOpacity(hostingView.bounds, in: ctx)
-        NSGraphicsContext.restoreGraphicsState()
+    }
 
-        guard let pngData = bitmapRep.representation(using: .png, properties: [:]) else { return }
+    private func buildShareHTML(
+        messages: [Message],
+        projectName: String,
+        startTime: Date?,
+        preset: ShareExportPreset
+    ) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        let start = startTime.map { formatter.string(from: $0) } ?? ""
 
-        // 保存到桌面
-        let desktop = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Desktop")
-        let fileName = "chat-share-\(selected.count)msgs.png"
-        let filePath = desktop.appendingPathComponent(fileName)
-        try? pngData.write(to: filePath)
+        let messageHTML = messages.map { msg in
+            let isUser = msg.role == "human" || msg.role == "user"
+            let role = isUser ? "You" : "Claude"
+            let roleClass = isUser ? "user" : "assistant"
+            let timeText: String
+            if let ts = msg.timestamp {
+                let t = DateFormatter()
+                t.dateFormat = "HH:mm"
+                timeText = t.string(from: ts)
+            } else {
+                timeText = ""
+            }
+            return """
+            <section class="bubble \(roleClass)">
+              <header class="meta">
+                <span class="role">\(escapeHTML(role))</span>
+                <span class="time">\(escapeHTML(timeText))</span>
+              </header>
+              <article class="content">\(escapeHTML(msg.content))</article>
+            </section>
+            """
+        }.joined(separator: "\n")
 
-        // 复制图片到剪贴板
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setData(pngData, forType: .png)
+        return """
+        <!doctype html>
+        <html lang="zh-CN">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <style>
+            :root {
+              --font-main: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", sans-serif;
+              --canvas: #0a0a0a;
+              --text: #f2f5ff;
+              --muted: rgba(255,255,255,0.62);
+              --card-bg: #16213E;
+              --top-bg: #1A1A2E;
+              --footer-bg: #0F3460;
+              --card-border: rgba(255,255,255,0.08);
+              --card-radius: 12px;
+              --bubble-radius: 10px;
+              --bubble-user-bg: rgba(0,212,170,0.10);
+              --bubble-user-border: rgba(0,212,170,0.28);
+              --bubble-assist-bg: rgba(123,97,255,0.10);
+              --bubble-assist-border: rgba(123,97,255,0.28);
+              --role-user: #00D4AA;
+              --role-assist: #8F81FF;
+              --content: rgba(255,255,255,0.9);
+            }
+            body {
+              margin: 0;
+              background: var(--canvas);
+              font-family: var(--font-main);
+              color: var(--text);
+              padding: 12px;
+            }
+            .card {
+              width: \(Int(preset.cardWidth))px;
+              border-radius: var(--card-radius);
+              overflow: hidden;
+              border: 1px solid var(--card-border);
+              background: var(--card-bg);
+            }
+            .top {
+              background: var(--top-bg);
+              padding: 16px;
+              border-bottom: 1px solid var(--card-border);
+            }
+            .title { font-size: 14px; font-weight: 700; color: var(--text); margin: 0 0 3px 0; }
+            .sub { font-size: 10px; color: var(--muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+            .preset {
+              font-size: 9px;
+              padding: 2px 6px;
+              border-radius: 999px;
+              border: 1px solid var(--card-border);
+              color: var(--muted);
+            }
+            .msgs { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+            .bubble {
+              border-radius: var(--bubble-radius);
+              padding: 12px;
+              border: 1px solid transparent;
+            }
+            .bubble.user { background: var(--bubble-user-bg); border-color: var(--bubble-user-border); }
+            .bubble.assistant { background: var(--bubble-assist-bg); border-color: var(--bubble-assist-border); }
+            .meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+            .role { font-size: 11px; font-weight: 700; color: var(--role-assist); }
+            .bubble.user .role { color: var(--role-user); }
+            .time { font-size: 9px; color: rgba(255,255,255,0.36); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+            .content {
+              font-size: 12px;
+              line-height: 1.55;
+              color: var(--content);
+              white-space: pre-wrap;
+              word-break: break-word;
+            }
+            .footer {
+              background: var(--footer-bg);
+              padding: 10px 16px;
+              display: flex;
+              justify-content: space-between;
+              font-size: 9px;
+              color: rgba(255,255,255,0.3);
+              font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            }
 
-        isSelectMode = false
-        selectedMessageIDs.removeAll()
+            /* X: 极简黑白，硬边框，报纸感标题 */
+            body.theme-x {
+              --font-main: "Helvetica Neue", "PingFang SC", Arial, sans-serif;
+              --canvas: #0d0d0d;
+              --text: #f3f3f3;
+              --muted: rgba(243,243,243,0.62);
+              --card-bg: #111;
+              --top-bg: #000;
+              --footer-bg: #000;
+              --card-border: rgba(255,255,255,0.22);
+              --card-radius: 2px;
+              --bubble-radius: 2px;
+              --bubble-user-bg: rgba(255,255,255,0.05);
+              --bubble-user-border: rgba(255,255,255,0.30);
+              --bubble-assist-bg: rgba(255,255,255,0.02);
+              --bubble-assist-border: rgba(255,255,255,0.18);
+              --role-user: #fff;
+              --role-assist: #d8d8d8;
+            }
+            body.theme-x .title { text-transform: uppercase; letter-spacing: .08em; font-weight: 800; }
+            body.theme-x .bubble { box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); }
 
-        // 打开图片
-        NSWorkspace.shared.open(filePath)
+            /* LinkedIn: 亮色商务卡片 */
+            body.theme-linkedin {
+              --font-main: "Avenir Next", "PingFang SC", "Helvetica Neue", sans-serif;
+              --canvas: #f3f6fb;
+              --text: #0f172a;
+              --muted: rgba(15,23,42,0.62);
+              --card-bg: #ffffff;
+              --top-bg: linear-gradient(135deg, #0a66c2, #005fb8);
+              --footer-bg: #eef3fb;
+              --card-border: rgba(10,102,194,0.24);
+              --card-radius: 16px;
+              --bubble-radius: 14px;
+              --bubble-user-bg: #e8f3ff;
+              --bubble-user-border: #a8cff6;
+              --bubble-assist-bg: #f6f8fc;
+              --bubble-assist-border: #d9e2f2;
+              --role-user: #0a66c2;
+              --role-assist: #334155;
+              --content: #1f2937;
+            }
+            body.theme-linkedin .card { box-shadow: 0 14px 32px rgba(15,23,42,0.12); }
+            body.theme-linkedin .top { color: #fff; border-bottom: none; }
+            body.theme-linkedin .top .title, body.theme-linkedin .top .sub, body.theme-linkedin .top .preset { color: #fff; border-color: rgba(255,255,255,0.35); }
+            body.theme-linkedin .time { color: rgba(30,41,59,0.45); }
 
+            /* Slack: 终端频道风，等宽正文，左侧信道条 */
+            body.theme-slack {
+              --font-main: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+              --canvas: #1d1c1d;
+              --text: #f8f8f8;
+              --muted: rgba(248,248,248,0.65);
+              --card-bg: #252327;
+              --top-bg: #2c2a30;
+              --footer-bg: #2c2a30;
+              --card-border: rgba(255,255,255,0.10);
+              --card-radius: 10px;
+              --bubble-radius: 8px;
+              --bubble-user-bg: rgba(46,182,125,0.10);
+              --bubble-user-border: rgba(46,182,125,0.36);
+              --bubble-assist-bg: rgba(255,255,255,0.04);
+              --bubble-assist-border: rgba(255,255,255,0.14);
+              --role-user: #2eb67d;
+              --role-assist: #f2c744;
+            }
+            body.theme-slack .bubble { border-left-width: 4px; }
+            body.theme-slack .content { font-size: 11px; letter-spacing: .01em; }
+
+            /* Telegram: 轻快蓝白，更圆润聊天气泡 */
+            body.theme-telegram {
+              --font-main: "SF Pro Rounded", "PingFang SC", -apple-system, sans-serif;
+              --canvas: #dceefb;
+              --text: #0b1f33;
+              --muted: rgba(11,31,51,0.62);
+              --card-bg: #f6fbff;
+              --top-bg: #5ca9e6;
+              --footer-bg: #eaf5ff;
+              --card-border: rgba(20,93,161,0.20);
+              --card-radius: 20px;
+              --bubble-radius: 18px;
+              --bubble-user-bg: #dcf8c6;
+              --bubble-user-border: rgba(73,174,79,0.25);
+              --bubble-assist-bg: #ffffff;
+              --bubble-assist-border: rgba(92,169,230,0.35);
+              --role-user: #2d8f2d;
+              --role-assist: #1f6cb2;
+              --content: #0c2a44;
+            }
+            body.theme-telegram .msgs { background: linear-gradient(180deg, rgba(92,169,230,0.08), rgba(92,169,230,0.02)); }
+            body.theme-telegram .time { color: rgba(11,31,51,0.42); }
+          </style>
+        </head>
+        <body class="theme-\(preset.slug)">
+          <main class="card">
+            <header class="top">
+              <h1 class="title">Claude Code</h1>
+              <div class="sub">
+                <span class="preset">\(escapeHTML(preset.label))</span>
+                <span>\(escapeHTML(projectName))</span>
+                <span>\(escapeHTML(start))</span>
+              </div>
+            </header>
+            <section class="msgs">
+              \(messageHTML)
+            </section>
+            <footer class="footer">
+              <span>cc-statistics</span>
+              <span>github.com/androidZzT/cc-statistics</span>
+            </footer>
+          </main>
+        </body>
+        </html>
+        """
+    }
+
+    private func escapeHTML(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "'", with: "&#39;")
+    }
+
+    private func shareFileStamp() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        return formatter.string(from: Date())
+    }
+
+    private func showShareToast(_ message: String) {
         withAnimation {
-            toastMessage = L10n.isChinese ? "已保存到桌面并打开" : "Saved to Desktop"
+            toastMessage = message
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             withAnimation {
@@ -573,6 +947,158 @@ struct ConversationView: View {
             let h = totalSeconds / 3600
             let m = (totalSeconds % 3600) / 60
             return m > 0 ? "\(h)h \(m)m" : "\(h)h"
+        }
+    }
+}
+
+// MARK: - HTML Share Renderer
+
+@MainActor
+private final class HTMLShareRenderer: NSObject, WKNavigationDelegate {
+    private let webView: WKWebView
+    private let viewportWidth: Int
+    private let scale: CGFloat
+    private var loadContinuation: CheckedContinuation<Void, Error>?
+
+    init(viewportWidth: Int, scale: CGFloat) {
+        self.viewportWidth = viewportWidth
+        self.scale = scale
+        let config = WKWebViewConfiguration()
+        config.suppressesIncrementalRendering = false
+        self.webView = WKWebView(frame: .zero, configuration: config)
+        super.init()
+        webView.navigationDelegate = self
+        webView.setValue(false, forKey: "drawsBackground")
+        webView.frame = CGRect(x: 0, y: 0, width: CGFloat(viewportWidth), height: 1)
+    }
+
+    func load(html: String) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            loadContinuation = continuation
+            webView.loadHTMLString(html, baseURL: nil)
+        }
+        // 等待一次布局稳定，避免刚加载完抓图出现空白/跳动
+        try await Task.sleep(nanoseconds: 120_000_000)
+    }
+
+    func renderPNGPages(maxPageHeight: Int) async throws -> [Data] {
+        let size = try await contentSize()
+        let pageHeight = max(600, maxPageHeight)
+        var offsetY: CGFloat = 0
+        var pages: [Data] = []
+
+        while offsetY < size.height - 0.5 {
+            let thisHeight = min(CGFloat(pageHeight), size.height - offsetY)
+            let snapshot = try await webView.snapshotImage(
+                rect: CGRect(x: 0, y: offsetY, width: size.width, height: thisHeight),
+                scale: scale
+            )
+            guard let tiff = snapshot.tiffRepresentation,
+                  let rep = NSBitmapImageRep(data: tiff),
+                  let pngData = rep.representation(using: .png, properties: [:]) else {
+                throw NSError(domain: "ccstats.share", code: 2)
+            }
+            pages.append(pngData)
+            offsetY += thisHeight
+        }
+
+        return pages
+    }
+
+    func renderPDFData() async throws -> Data {
+        let size = try await contentSize()
+        if #available(macOS 11.0, *) {
+            return try await webView.pdfData(rect: CGRect(x: 0, y: 0, width: size.width, height: size.height))
+        }
+        return webView.dataWithPDF(inside: CGRect(x: 0, y: 0, width: size.width, height: size.height))
+    }
+
+    private func contentSize() async throws -> CGSize {
+        let raw = try await webView.evaluateJS("""
+        (() => {
+          const d = document.documentElement;
+          const b = document.body;
+          const w = Math.max(d.scrollWidth, b.scrollWidth, d.clientWidth, \(viewportWidth));
+          const h = Math.max(d.scrollHeight, b.scrollHeight, d.clientHeight);
+          return JSON.stringify({ width: w, height: h });
+        })();
+        """)
+
+        guard let str = raw as? String,
+              let data = str.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let w = obj["width"] as? Double,
+              let h = obj["height"] as? Double else {
+            throw NSError(domain: "ccstats.share", code: 1)
+        }
+
+        let width = max(CGFloat(viewportWidth), CGFloat(w))
+        let height = max(1, CGFloat(h))
+        webView.frame = CGRect(x: 0, y: 0, width: width, height: height)
+        return CGSize(width: width, height: height)
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        loadContinuation?.resume()
+        loadContinuation = nil
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        loadContinuation?.resume(throwing: error)
+        loadContinuation = nil
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        loadContinuation?.resume(throwing: error)
+        loadContinuation = nil
+    }
+}
+
+private extension WKWebView {
+    func evaluateJS(_ script: String) async throws -> Any? {
+        try await withCheckedThrowingContinuation { continuation in
+            self.evaluateJavaScript(script) { result, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                continuation.resume(returning: result)
+            }
+        }
+    }
+
+    func snapshotImage(rect: CGRect, scale: CGFloat) async throws -> NSImage {
+        try await withCheckedThrowingContinuation { continuation in
+            let config = WKSnapshotConfiguration()
+            config.rect = rect
+            config.snapshotWidth = NSNumber(value: Double(rect.width * scale))
+            self.takeSnapshot(with: config) { image, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                guard let image else {
+                    continuation.resume(throwing: NSError(domain: "ccstats.share", code: 3))
+                    return
+                }
+                continuation.resume(returning: image)
+            }
+        }
+    }
+
+    @available(macOS 11.0, *)
+    func pdfData(rect: CGRect) async throws -> Data {
+        try await withCheckedThrowingContinuation { continuation in
+            let config = WKPDFConfiguration()
+            config.rect = rect
+            self.createPDF(configuration: config) { result in
+                switch result {
+                case .success(let data):
+                    continuation.resume(returning: data)
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
         }
     }
 }
@@ -691,7 +1217,7 @@ struct ShareCardView: View {
                 }
             }
 
-            MarkdownContentView(text: String(message.content.prefix(2000)))
+            MarkdownContentView(text: message.content)
         }
         .padding(12)
         .background(

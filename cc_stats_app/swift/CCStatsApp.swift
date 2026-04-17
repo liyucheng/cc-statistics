@@ -356,7 +356,7 @@ class StatusBarController {
         }
 
         // 合成图标+文字为单张 NSImage
-        let textColor: NSColor = isOverLimit ? .systemRed : .headerTextColor
+        let textColor: NSColor = isOverLimit ? .systemRed : .white
         let compositeImage = renderStatusBarImage(icon: icon, line1: line1, line2: line2, textColor: textColor)
         button.image = compositeImage
         button.title = ""
@@ -604,7 +604,7 @@ class StatusBarController {
             button.image = icon
             button.imagePosition = .imageOnly
         } else {
-            let textColor: NSColor = isOverLimit ? .systemRed : .headerTextColor
+            let textColor: NSColor = isOverLimit ? .systemRed : .white
             let compositeImage = renderStatusBarImage(icon: icon, line1: renderedLine1, line2: renderedLine2, textColor: textColor)
             button.image = compositeImage
             button.imagePosition = .imageOnly
@@ -760,7 +760,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: 500, height: 660),
-            styleMask: [.titled, .fullSizeContentView, .nonactivatingPanel],
+            styleMask: [.titled, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
@@ -774,9 +774,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         panel.backgroundColor = .windowBackgroundColor
         panel.contentView = NSHostingView(rootView: contentView)
         panel.isReleasedWhenClosed = false
-        panel.level = .floating
-        panel.hidesOnDeactivate = false
-        panel.isFloatingPanel = true
+        panel.level = .normal
+        panel.hidesOnDeactivate = true
+        panel.isFloatingPanel = false
         panel.hasShadow = true
         panel.isMovableByWindowBackground = false
         applyThemeToPanel(panel)

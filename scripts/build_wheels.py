@@ -61,6 +61,7 @@ def compile_app(arch: str):
             "-framework", "SwiftUI",
             "-framework", "Carbon",
             "-framework", "UserNotifications",
+            "-framework", "WebKit",
             "-lsqlite3",
             "-O",
         ],

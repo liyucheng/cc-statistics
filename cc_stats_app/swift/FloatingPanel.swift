@@ -8,22 +8,22 @@ class FloatingPanel: NSPanel {
     init(contentRect: NSRect) {
         super.init(
             contentRect: contentRect,
-            styleMask: [.titled, .closable, .resizable, .nonactivatingPanel, .fullSizeContentView, .utilityWindow],
+            styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
 
         titlebarAppearsTransparent = true
         titleVisibility = .hidden
-        level = .floating
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        level = .normal
+        collectionBehavior = [.moveToActiveSpace]
         isOpaque = false
         backgroundColor = .clear
         hasShadow = true
         isMovableByWindowBackground = true
         isReleasedWhenClosed = false
-        hidesOnDeactivate = false
-        isFloatingPanel = true
+        hidesOnDeactivate = true
+        isFloatingPanel = false
         minSize = NSSize(width: 340, height: 400)
 
         let visualEffect = NSVisualEffectView(frame: contentRect)
@@ -45,7 +45,7 @@ class FloatingPanel: NSPanel {
     }
 
     override var canBecomeKey: Bool { true }
-    override var canBecomeMain: Bool { false }
+    override var canBecomeMain: Bool { true }
 
     func positionAtRightCenter() {
         guard let screen = NSScreen.main else { return }

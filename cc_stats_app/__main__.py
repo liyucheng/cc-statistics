@@ -234,6 +234,7 @@ def _compile_swift():
             "-framework", "SwiftUI",
             "-framework", "Carbon",
             "-framework", "UserNotifications",
+            "-framework", "WebKit",
             "-lsqlite3",
             "-O",
         ],

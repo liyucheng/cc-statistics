@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.12.19 (2026-04-17)
+
+### Share Export
+- Rebuild conversation share export pipeline with HTML + WebKit rendering (instead of direct SwiftUI snapshot), improving content completeness and stability
+- Fix truncated share content and pagination/cropping issues in exported PNG/PDF
+- Add preset-specific visual themes (Balanced / X / LinkedIn / Slack / Telegram) with clearly different style languages
+
+### macOS App
+- Restore status bar usage text to white for stable readability
+- Adjust panel/floating window behavior to avoid interfering with Dock auto-show
+
+### Build
+- Link WebKit framework in app compile scripts for local/dev and wheel builds
+
 ## v0.12.18 (2026-04-16)
 
 ### Pricing
