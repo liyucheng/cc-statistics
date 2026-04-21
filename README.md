@@ -73,6 +73,9 @@ Most tools only answer this for Claude Code. cc-statistics answers it for all fo
 ### 🖥️ Native macOS Menu Bar App
 > Pre-built SwiftUI binary — launch with `cc-stats-app` and it lives in your menu bar permanently. Shows Claude logo + today's token count + estimated cost at a glance. Turns **red** when you hit your daily usage quota. Right-click to switch display modes. Global hotkey `Cmd+Shift+C` opens the full dashboard from anywhere.
 
+### 🏝️ Claude-Style Island Overlay
+> A notch-aware island overlay for macOS that surfaces Claude Code activity and permission requests in compact and expanded states. Review approvals, jump into chat context, and keep the flow visible without constantly context-switching back to the terminal.
+
 ### 🐾 Clawd — Pixel-Art Status Bar Mascot
 > A pixel-art Clawd mascot reacts to Claude Code's agent state in real time: idle, thinking, typing, happy, sleeping, and error — each with its own animated sprite. Built on [clawd-on-desk](https://github.com/rullerzhou-afk/clawd-on-desk) hook integration.
 
@@ -246,6 +249,8 @@ All data is read from local files. Nothing is sent over the network.
 ## Acknowledgments
 
 Status bar Clawd animation sprites from [clawd-on-desk](https://github.com/rullerzhou-afk/clawd-on-desk) — an Electron desktop pet that senses AI coding agent state via hooks and plays pixel-art animations.
+
+Special thanks to [Farouq Aldori](https://github.com/farouqaldori) and the [claude-island / vibe-notch](https://github.com/farouqaldori/vibe-notch) project for the inspiration behind the macOS notch island interaction model, compact/expanded motion language, and approval-panel design direction.
 
 ---
 

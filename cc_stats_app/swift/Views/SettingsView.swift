@@ -393,7 +393,7 @@ struct SettingsView: View {
                             }
                             Spacer()
 
-                            if let latest = latestVersion, latest != currentVersion {
+                            if let latest = newerVersion {
                                 Button {
                                     NSWorkspace.shared.open(URL(string: "https://github.com/androidZzT/cc-statistics/releases/latest")!)
                                 } label: {
@@ -597,9 +597,15 @@ struct SettingsView: View {
 
     private var currentVersion: String { Self.appVersion }
 
+    private var newerVersion: String? {
+        guard let latestVersion else { return nil }
+        return Self.isNewer(remote: latestVersion, local: currentVersion) ? latestVersion : nil
+    }
+
     private func checkForUpdate() {
         guard !checkingUpdate else { return }
         checkingUpdate = true
+        let current = currentVersion
 
         // 查询 GitHub Releases 最新版本
         guard let url = URL(string: "https://api.github.com/repos/androidZzT/cc-statistics/releases/latest") else { return }
@@ -613,9 +619,30 @@ struct SettingsView: View {
             // tag_name 格式为 "v0.6.1"，去掉 "v" 前缀
             let version = tagName.hasPrefix("v") ? String(tagName.dropFirst()) : tagName
             DispatchQueue.main.async {
-                latestVersion = version
+                latestVersion = Self.isNewer(remote: version, local: current) ? version : nil
             }
         }.resume()
+    }
+
+    private static func parseVersion(_ version: String) -> [Int] {
+        version
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: #"^[vV]"#, with: "", options: .regularExpression)
+            .split(separator: ".")
+            .map { Int($0) ?? 0 }
+    }
+
+    private static func isNewer(remote: String, local: String) -> Bool {
+        let remoteParts = parseVersion(remote)
+        let localParts = parseVersion(local)
+        let maxLen = max(remoteParts.count, localParts.count)
+        for index in 0..<maxLen {
+            let remoteValue = index < remoteParts.count ? remoteParts[index] : 0
+            let localValue = index < localParts.count ? localParts[index] : 0
+            if remoteValue > localValue { return true }
+            if remoteValue < localValue { return false }
+        }
+        return false
     }
 
     // MARK: - Settings Logic
