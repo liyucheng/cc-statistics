@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.0.0 (2026-04-21)
+
+### Major Release
+- Ship the first complete `1.0.0` release of CCStats across CLI, macOS app, web dashboard, hooks, and bridge tooling
+- Stabilize Claude Code approval workflow with local bridge support, actionable Allow/Deny controls, and better hook coverage
+- Add macOS notch-style island overlay with compact/expanded states aligned to the Claude island interaction model
+
+### Performance
+- Reduce dashboard memory pressure with streaming-style parsing and progressive rendering for large session histories
+- Lazy-load full conversation details only when the conversation panel opens to lower startup overhead
+
+### Data Coverage
+- Add Codex session ingestion from `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`
+- Improve model attribution, token accounting, and cost estimation for Codex/OpenAI, Claude, and Gemini families
+
+### Sharing
+- Rebuild conversation share export on top of HTML + WebKit rendering for sharper PNG/PDF output and more reliable long-content export
+- Add preset-specific share themes for different social and communication surfaces
+
 ## v0.12.19 (2026-04-17)
 
 ### Share Export
