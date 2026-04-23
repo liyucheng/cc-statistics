@@ -73,6 +73,9 @@
 ### 🖥️ 原生 macOS 状态栏应用
 > 预编译 SwiftUI 二进制 — 运行 `cc-stats-app` 后常驻状态栏。一眼看到 Claude logo + 当日 Token 用量 + 预估费用。触达每日用量额度时变**红**预警。右键菜单切换显示模式。全局快捷键 `Cmd+Shift+C` 随时唤出完整面板。
 
+### 🏝️ Claude 风格 Island 浮层
+> 面向 macOS 刘海屏的 island 浮层，可用紧凑态和展开态展示 Claude Code 的工作状态与权限请求。无需频繁切回终端，也能在当前工作流中直接完成查看、确权和继续处理。
+
 ### 🐾 Clawd — 像素风状态栏吉祥物
 > 像素风 Clawd 吉祥物实时感知 Claude Code 的 Agent 状态：空闲、思考、输入、开心、休眠、报错 — 每种状态对应独立动画精灵。基于 [clawd-on-desk](https://github.com/rullerzhou-afk/clawd-on-desk) hook 集成实现。
 
@@ -246,6 +249,8 @@ cc-stats-app                  # 启动 macOS 状态栏应用
 ## 致谢
 
 状态栏 Clawd 动画素材来自 [clawd-on-desk](https://github.com/rullerzhou-afk/clawd-on-desk) — 一个 Electron 桌面宠物应用，通过 hook 系统实时感知 AI coding agent 的工作状态并播放像素风动画。
+
+特别感谢 [Farouq Aldori](https://github.com/farouqaldori) 和 [claude-island / vibe-notch](https://github.com/farouqaldori/vibe-notch) 项目，为 macOS 刘海 island 的交互模型、紧凑/展开动效语言，以及确权面板的设计方向提供了重要启发。
 
 ---
 
