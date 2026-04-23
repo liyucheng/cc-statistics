@@ -1075,21 +1075,20 @@ final class StatsViewModel: ObservableObject {
         }
     }
 
+    @MainActor
     private func performVersionCheck() {
-        Task.detached(priority: .utility) {
+        Task(priority: .utility) { [weak self] in
             guard let latestVersion = Self.fetchLatestVersionFromPyPI() else { return }
             let currentVersion = Self.readCurrentVersion()
             guard Self.isNewer(remote: latestVersion, local: currentVersion) else { return }
 
-            await MainActor.run { [weak self] in
-                guard let self else { return }
-                self.updateAvailable = latestVersion
+            guard let self else { return }
+            self.updateAvailable = latestVersion
 
-                // 仅在首次发现新版本时触发自动升级
-                if self.hasNotifiedVersion != latestVersion {
-                    self.hasNotifiedVersion = latestVersion
-                    self.autoUpgrade(to: latestVersion)
-                }
+            // 仅在首次发现新版本时触发自动升级
+            if self.hasNotifiedVersion != latestVersion {
+                self.hasNotifiedVersion = latestVersion
+                self.autoUpgrade(to: latestVersion)
             }
         }
     }

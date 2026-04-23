@@ -411,6 +411,18 @@ struct DashboardView: View {
 
                 Spacer()
 
+                // Screenshot button
+                Button {
+                    takeScreenshot()
+                } label: {
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(Theme.textSecondary)
+                        .frame(width: 24, height: 24)
+                }
+                .buttonStyle(.plain)
+                .help("Screenshot")
+
                 // Export button
                 if let stats = viewModel.stats {
                     Menu {
@@ -1413,6 +1425,92 @@ struct DashboardView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             withAnimation { toastMessage = nil }
         }
+    }
+
+    // MARK: - Screenshot
+
+    private func takeScreenshot() {
+        // Show loading state
+        withAnimation { toastMessage = L10n.isChinese ? "截图中..." : "Capturing..." }
+
+        // Find main window
+        guard let window = NSApp.keyWindow ?? NSApp.windows.first(where: { $0.isVisible }) else {
+            withAnimation { toastMessage = L10n.isChinese ? "截图失败" : "Screenshot failed" }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                withAnimation { toastMessage = nil }
+            }
+            return
+        }
+
+        // Capture window using dataWithPDF - simpler and more reliable
+        guard let windowView = window.contentView else {
+            withAnimation { toastMessage = L10n.isChinese ? "截图失败" : "Screenshot failed" }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                withAnimation { toastMessage = nil }
+            }
+            return
+        }
+
+        // Find the ScrollView's NSScrollView and capture its full content
+        var capturedImage: NSImage?
+        
+        func findScrollView(in view: NSView) -> NSScrollView? {
+            if let scrollView = view as? NSScrollView {
+                return scrollView
+            }
+            for subview in view.subviews {
+                if let found = findScrollView(in: subview) {
+                    return found
+                }
+            }
+            return nil
+        }
+
+        if let scrollView = findScrollView(in: windowView),
+           let documentView = scrollView.documentView {
+            // Capture the full scrollable content
+            let originalBounds = scrollView.bounds
+            let originalClipViewBounds = scrollView.contentView.bounds
+            
+            // Temporarily expand to show full content
+            scrollView.contentView.setBoundsOrigin(.zero)
+            let pdfData = documentView.dataWithPDF(inside: documentView.bounds)
+            
+            // Restore original scroll position
+            scrollView.contentView.setBoundsOrigin(originalClipViewBounds.origin)
+            
+            capturedImage = NSImage(data: pdfData)
+        } else {
+            // Fallback: capture window view as before
+            let pdfData = windowView.dataWithPDF(inside: windowView.bounds)
+            capturedImage = NSImage(data: pdfData)
+        }
+
+        guard let finalImage = capturedImage else {
+            withAnimation { toastMessage = L10n.isChinese ? "截图失败" : "Screenshot failed" }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                withAnimation { toastMessage = nil }
+            }
+            return
+        }
+
+        // Copy to clipboard
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.writeObjects([finalImage])
+
+        withAnimation { toastMessage = L10n.isChinese ? "已复制到剪切板" : "Copied to clipboard" }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            withAnimation { toastMessage = nil }
+        }
+    }
+}
+
+// MARK: - View Extension for Tooltip
+
+extension View {
+    func tooltip(_ text: String) -> some View {
+        self.help(text)
     }
 }
 
