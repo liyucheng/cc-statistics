@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CC Statistics - Git Log</title>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<style>
+:root{--bg:#0d1117;--card:#161b22;--border:#30363d;--text:#e6edf3;--text2:#8b949e;--text3:#6e7681;--cyan:#58a6ff;--purple:#bc8cff;--green:#3fb950;--amber:#f0883e;--red:#f85149;--pink:#f778ba}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);line-height:1.5}
+.app{max-width:1200px;margin:0 auto;padding:20px}
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px}
+.header h1{font-size:22px;font-weight:700;background:linear-gradient(135deg,var(--cyan),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.controls{display:flex;gap:8px;align-items:center}
+select, input{background:var(--card);border:1px solid var(--border);color:var(--text);padding:6px 12px;border-radius:6px;font-size:13px;cursor:pointer}
+select:hover, input:hover{border-color:var(--cyan)}
+.btn{background:var(--card);border:1px solid var(--border);color:var(--text);padding:6px 12px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;transition:.2s}
+.btn:hover{border-color:var(--cyan);background:rgba(88,166,255,.1)}
+.btn.active{background:var(--cyan);color:#fff;border-color:var(--cyan)}
+.screenshot-btn{background:var(--cyan);border:none;color:#fff;padding:6px 14px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;transition:.2s}
+.screenshot-btn:hover{background:#4a9eff}
+.screenshot-btn:disabled{opacity:.5;cursor:not-allowed}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px}
+.card-title{font-size:14px;font-weight:600;color:var(--text2);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.metric{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;transition:.2s}
+.metric:hover{border-color:rgba(255,255,255,.12);transform:translateY(-1px)}
+.metric-label{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.metric-value{font-size:24px;font-weight:700;letter-spacing:-1px}
+.metric-sub{font-size:11px;color:var(--text3);margin-top:2px}
+.metric[data-t="token"] .metric-value{color:var(--cyan)}
+.metric[data-t="dur"] .metric-value{color:var(--green)}
+.metric[data-t="code"] .metric-value{color:var(--purple)}
+.metric[data-t="cost"] .metric-value{color:var(--amber)}
+.author-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.author-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px}
+.author-header{display:flex;align-items:center;gap:12px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+.author-name{font-size:16px;font-weight:700;color:var(--text)}
+.author-total{font-size:12px;color:var(--text3)}
+.period-table{width:100%;border-collapse:collapse;font-size:12px}
+.period-table th{text-align:left;color:var(--text3);font-weight:500;padding:8px 4px;border-bottom:1px solid var(--border)}
+.period-table td{padding:8px 4px;border-bottom:1px solid var(--border)}
+.period-table tr:last-child td{border:none}
+.period-table .num{text-align:right;font-family:monospace}
+.period-table .pos{color:var(--green)}
+.period-table .neg{color:var(--red)}
+.summary{display:flex;gap:20px;align-items:center;padding:8px 0}
+.summary-item{display:flex;flex-direction:column}
+.summary-label{font-size:10px;color:var(--text3)}
+.summary-value{font-size:14px;font-weight:600}
+.empty{text-align:center;padding:60px 20px;color:var(--text3)}
+.loading{display:flex;align-items:center;justify-content:center;padding:40px;color:var(--text3);font-size:13px}
+.error{background:rgba(248,81,73,.1);border:1px solid var(--red);border-radius:8px;padding:12px;color:var(--red);font-size:13px;margin-bottom:16px}
+@media(max-width:900px){.metrics{grid-template-columns:repeat(2,1fr)}.author-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1>Git Log Statistics</h1>
+    <div class="controls">
+      <button class="screenshot-btn" onclick="takeScreenshot()" id="screenshot-btn">📸 截图</button>
+      <a href="index.html" class="time-btn" style="text-decoration:none">Dashboard</a>
+      <input type="text" id="log-file" placeholder="Log file path (.ai-usage.log)" style="width:200px">
+      <div style="display:flex;gap:2px;background:var(--card);border-radius:6px;padding:2px;border:1px solid var(--border)">
+        <button class="btn active" data-dim="day">Day</button>
+        <button class="btn" data-dim="week">Week</button>
+        <button class="btn" data-dim="month">Month</button>
+      </div>
+      <button class="btn" onclick="loadGitLogStats()">Refresh</button>
+    </div>
+  </div>
+  
+  <div id="error-msg" class="error" style="display:none"></div>
+  
+  <div class="card">
+    <div class="card-title">
+      <span>📊 Summary</span>
+      <span style="font-size:12px;color:var(--text3);font-weight:400" id="info"></span>
+    </div>
+    <div class="metrics" id="summary-metrics">
+    <div class="metric"">
+      <div class="metric-label">Total Tokens</div>
+      <div class="metric-value" id="v-token">—</div>
+      <div class="metric-sub" id="s-token"></div>
+    </div>
+    <div class="metric" data-t="dur">
+      <div class="metric-label">Active Time</div>
+      <div class="metric-value" id="v-dur">—</div>
+      <div class="metric-sub" id="s-dur"></div>
+    </div>
+    <div class="metric" data-t="code">
+      <div class="metric-label">Code Lines</div>
+      <div class="metric-value" id="v-code">—</div>
+      <div class="metric-sub" id="s-code"></div>
+    </div>
+    <div class="metric" data-t="cost">
+      <div class="metric-label">Total Cost</div>
+      <div class="metric-value" id="v-cost">—</div>
+      <div class="metric-sub" id="s-cost"></div>
+    </div>
+  </div>
+  </div>
+  
+  <div class="card">
+    <div class="card-title">👥 Author Breakdown</div>
+    <div id="authors-grid" class="author-grid"></div>
+  </div>
+</div>
+
+<script>
+let currentLogFile = '';
+let currentDimension = 'day';
+const COLORS = ['#58a6ff', '#bc8cff', '#3fb950', '#f0883e', '#f85149', '#f778ba', '#39d2c0', '#d29922'];
+
+function fmt(n) {
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+  return n.toLocaleString();
+}
+
+function fmtCost(n) {
+  return n >= 100 ? '$' + n.toFixed(0) : n >= 1 ? '$' + n.toFixed(2) : n >= .01 ? '$' + n.toFixed(3) : '$' + n.toFixed(4);
+}
+
+function fmtDuration(seconds) {
+  total = Math.floor(seconds);
+  if (total < 0) return '0s';
+  h = Math.floor(total / 3600);
+  m = Math.floor((total % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+async function api(path, params) {
+  const url = new URL(path, location.origin);
+  if (params) Object.entries(params).forEach(([k, v]) => {
+    if (v != null && v !== '') url.searchParams.set(k, v);
+  });
+  return (await fetch(url)).json();
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function hideError() {
+  document.getElementById('error-msg').style.display = 'none';
+}
+
+async function loadGitLogStats() {
+  hideError();
+  
+  const logFile = document.getElementById('log-file').value.trim();
+  const el = document.getElementById('authors-grid');
+  
+  el.innerHTML = '<div class="loading">Loading Git log statistics...</div>';
+  
+  try {
+    const data = await api('/api/git-log-stats', {
+      log_file: logFile || null,
+      dimension: currentDimension
+    });
+    
+    if (data.error) {
+      showError(data.error);
+      el.innerHTML = '';
+      document.getElementById('summary-metrics').innerHTML = '';
+      document.getElementById('info').textContent = '';
+      return;
+    }
+    
+    document.getElementById('info').textContent = `Log file: ${data.log_file} | ${data.total_authors} authors`;
+    
+    renderSummary(data);
+    renderAuthors(data);
+    
+  } catch (e) {
+    showError('Failed to load Git log stats: ' + e.message);
+    el.innerHTML = '';
+  }
+}
+
+function renderSummary(data) {
+  let totalCommits = 0;
+  let totalSessions = 0;
+  let totalDuration = 0;
+  let totalCode = 0;
+  let totalTokens = 0;
+  let totalCost = 0;
+  
+  data.authors.forEach(author => {
+    author.stats.forEach(stat => {
+      totalCommits += stat.commit_count;
+      totalSessions += stat.sessions;
+      totalDuration += stat.duration_seconds;
+      totalCode += Math.abs(stat.code_net);
+      totalTokens += stat.tokens;
+      totalCost += stat.cost;
+    });
+  });
+  
+  document.getElementById('v-token').textContent = fmt(totalTokens);
+  document.getElementById('s-token').textContent = totalCommits + ' commits';
+  document.getElementById('v-dur').textContent = fmtDuration(totalDuration);
+  document.getElementById('s-dur').textContent = totalSessions + ' sessions';
+  document.getElementById('v-code').textContent = fmt(totalCode);
+  document.getElementById('s-code').textContent = 'changed';
+  document.getElementById('v-cost').textContent = fmtCost(totalCost);
+  document.getElementById('s-cost').textContent = data.total_authors + ' authors';
+}
+
+function renderAuthors(data) {
+  const el = document.getElementById('authors-grid');
+  
+  if (!data.authors || data.authors.length === 0) {
+    el.innerHTML = '<div class="empty">No data available</div>';
+    return;
+  }
+  
+  let html = '';
+  
+  data.authors.forEach((author, idx) => {
+    // Calculate totals for this author
+    const authorTotal = author.stats.reduce((acc, s) => ({
+      commits: acc.commits + s.commit_count,
+      sessions: acc.sessions + s.sessions,
+      duration: acc.duration + s.duration_seconds,
+      tokens: acc.tokens + s.tokens,
+      cost: acc.cost + s.cost,
+      codeAdded: acc.codeAdded + s.code_added,
+      codeRemoved: acc.codeRemoved + s.code_removed,
+    }), { commits: 0, sessions: 0, duration: 0, tokens: 0, cost: 0, codeAdded: 0, codeRemoved: 0 });
+    
+    // Generate period table rows
+    const periodRows = author.stats.map(stat => {
+      const codeClass = stat.code_net >= 0 ? 'pos' : 'neg';
+      const codeSign = stat.code_net >= 0 ? '+' : '';
+      return `
+        <tr>
+          <td>${stat.period}</td>
+          <td class="num">${stat.commit_count}</td>
+          <td class="num">${stat.sessions}</td>
+          <td class="num">${fmtDuration(stat.duration_seconds)}</td>
+          <td class="num ${codeClass}">${codeSign}${fmt(stat.code_net)}</td>
+          <td class="num">${fmt(stat.tokens)}</td>
+          <td class="num">${fmtCost(stat.cost)}</td>
+        </tr>
+      `;
+    }).join('');
+    
+    html += `
+      <div class="author-card">
+        <div class="author-header">
+          <div class="author-name">${escapeHtml(author.author)}</div>
+          <div class="author-total">
+            ${authorTotal.commits} commits | ${fmt(authorTotal.tokens)} tokens | ${fmtCost(authorTotal.cost)}
+          </div>
+        </div>
+        <table class="period-table">
+          <thead>
+            <tr>
+              <th>${currentDimension === 'day' ? 'Date' : currentDimension === 'week' ? 'Week' : 'Month'}</th>
+              <th class="num">Commits</th>
+              <th class="num">Sessions</th>
+              <th class="num">Time</th>
+              <th class="num">Code</th>
+              <th class="num">Tokens</th>
+              <th class="num">Cost</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${periodRows}
+          </tbody>
+        </table>
+      </div>
+    `;
+  });
+  
+  el.innerHTML = html;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function takeScreenshot(){
+  const btn=document.getElementById('screenshot-btn');
+  if(btn.disabled)return;
+  btn.disabled=true;
+  btn.textContent='⏳ 截图中...';
+  
+  const app=document.querySelector('.app');
+  html2canvas(app,{
+    backgroundColor:'#0d1117',
+    scale:2,
+    logging:false,
+    useCORS:true
+  }).then(canvas=>{
+    const link=document.createElement('a');
+    const timestamp=new Date().toISOString().slice(0,19).replace(/[T:]/g,'-');
+    link.download=`git-log-stats-${timestamp}.png`;
+    link.href=canvas.toDataURL('image/png');
+    link.click();
+    
+    btn.disabled=false;
+    btn.textContent='📸 截图';
+  }).catch(err=>{
+    console.error('Screenshot failed:',err);
+    alert('⚠️ 截图失败: '+err.message);
+    btn.disabled=false;
+    btn.textContent='📸 截图';
+  });
+}
+
+// Dimension buttons
+document.querySelectorAll('[data-dim]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-dim]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentDimension = btn.dataset.dim;
+    loadGitLogStats();
+  });
+});
+
+// Load on page load
+loadGitLogStats();
+</script>
+</body>
+</html>

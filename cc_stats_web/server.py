@@ -10,6 +10,9 @@ from datetime import datetime, timedelta, timezone
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 
+# Git log support
+from pathlib import Path
+
 from cc_stats.analyzer import SessionStats, TokenUsage, analyze_session, merge_stats
 from cc_stats.parser import (
     find_gemini_sessions,
@@ -361,6 +364,153 @@ def _get_version_update():
     return {"has_update": False}
 
 
+def _get_git_log_stats(log_file_path: str = None, dimension: str = "day"):
+    """获取 Git 日志统计，按维度（day/week/month）聚合
+    
+    Args:
+        log_file_path: 日志文件路径，默认为 .ai-usage.log
+        dimension: 统计维度，day/week/month
+    
+    Returns:
+        统计结果列表
+    """
+    from cc_stats.git_hook import read_ai_usage_log
+    from datetime import datetime, timedelta
+    
+    if log_file_path is None:
+        # 尝试默认的日志文件路径
+        default_paths = [
+            ".ai-usage.log",
+            ".logs/ai-usage.log",
+            os.path.join(os.getcwd(), ".ai-usage.log"),
+        ]
+        log_path = None
+        for path in default_paths:
+            if os.path.exists(path):
+                log_path = path
+                break
+        if log_path is None:
+            return {"error": "No Git log file found. Run 'cc-stats --install-git-hook' to set up."}
+    else:
+        log_path = log_file_path
+        if not os.path.exists(log_path):
+            log_path = os.path.join(os.getcwd(), log_file_path)
+        if not os.path.exists(log_path):
+            return {"error": f"Log file not found: {log_file_path}"}
+    
+    # 读取日志
+    logs = read_ai_usage_log(log_path)
+    if not logs:
+        return {"error": "No data in log file"}
+    
+    # 按维度聚合归
+    from collections import defaultdict
+    
+    # 按作者和维度分组
+    stats_by_author = defaultdict(lambda: defaultdict(list))
+    
+    for log in logs:
+        try:
+            timestamp_str = log.get("timestamp", "")
+            timestamp = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
+            
+            # 提取作者信息
+            commit = log.get("commit", {})
+            if not commit:
+                continue
+            author = commit.get("author", "Unknown")
+            author_email = commit.get("author_email", "")
+            
+            # 根据维度生成时间键
+            if dimension == "day":
+                time_key = timestamp.strftime("%Y-%m-%d")
+            elif dimension == "week":
+                # 周一到周日为一周
+                weekday = timestamp.weekday()
+                week_start = timestamp - timedelta(days=weekday)
+                time_key = week_start.strftime("%Y-%W")
+            elif dimension == "month":
+                time_key = timestamp.strftime("%Y-%m")
+            else:
+                time_key = timestamp.strftime("%Y-%m-%d")
+            
+            stats_by_author[author][time_key].append(log)
+        except Exception:
+            continue
+    
+    # 生成结果
+    result = []
+    
+    # 获取所有作者
+    for author, time_stats in stats_by_author.items():
+        author_data = {
+            "author": author,
+            "stats": []
+        }
+        
+        # 获取所有时间点并排序
+        all_times = sorted(time_stats.keys())
+        
+        for time_key in all_times:
+            period_logs = time_stats[time_key]
+            
+            # 聚合统计数据
+            total_sessions = 0
+            total_user_message_count = 0
+            total_tool_call_total = 0
+            total_active_duration_seconds = 0.0
+            total_added = 0
+            total_removed = 0
+            total_token_usage = 0
+            total_cost = 0.0
+            commit_count = len(period_logs)
+            
+            for log in period_logs:
+                stats = log.get("stats", {})
+                # Map fields from git_hook format
+                total_sessions += stats.get("session_count", 0)  # Not in current log format
+                total_user_message_count += stats.get("user_instructions", 0)
+                total_tool_call_total += stats.get("tool_calls", 0)
+                total_active_duration_seconds += stats.get("active_duration", 0)
+                total_added += stats.get("code_additions", 0)
+                total_removed += stats.get("code_deletions", 0)
+                total_token_usage += stats.get("total_tokens", 0)
+                total_cost += stats.get("estimated_cost", 0)
+            
+            # 格式化时长
+            total_duration = int(total_active_duration_seconds)
+            h, rem = divmod(total_duration, 3600)
+            m, s = divmod(rem, 60)
+            duration_fmt = f"{h}h {m}m" if h > 0 else f"{m}m"
+            
+            author_data["stats"].append({
+                "period": time_key,
+                "commit_count": commit_count,
+                "sessions": total_sessions,
+                "user_message_count": total_user_message_count,
+                "tool_calls": total_tool_call_total,
+                "duration": duration_fmt,
+                "duration_seconds": total_active_duration_seconds,
+                "code_added": total_added,
+                "code_removed": total_removed,
+                "code_net": total_added - total_removed,
+                "tokens": total_token_usage,
+                "cost": round(total_cost, 2),
+            })
+        
+        result.append(author_data)
+    
+    # 按总 Token 降序排序作者
+    result.sort(key=lambda x: sum(s["tokens"] for s in x["stats"]), reverse=True)
+    
+    return {
+        "dimension": dimension,
+        "authors": result,
+        "total_authors": len(result),
+        "log_file": log_path
+    }
+
+
 class ApiHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=_web_dir, **kwargs)
@@ -395,6 +545,10 @@ class ApiHandler(SimpleHTTPRequestHandler):
             ))
         elif path == "/api/version_check":
             self._json(_get_version_update())
+        elif path == "/api/git-log-stats":
+            log_file = params.get("log_file", [None])[0]
+            dimension = params.get("dimension", ["day"])[0]
+            self._json(_get_git_log_stats(log_file_path=log_file, dimension=dimension))
         else:
             super().do_GET()
 

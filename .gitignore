@@ -11,3 +11,4 @@ cc_stats_app/swift/CCStats.app/
 cc_stats_app/swift/.binary_version
 .DS_Store
 marketing/
+.idea/

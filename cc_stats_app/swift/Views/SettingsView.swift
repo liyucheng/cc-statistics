@@ -797,6 +797,7 @@ struct SettingsView: View {
         }
     }
 
+    @MainActor
     private func sendTestNotification() {
         let title = "CC Stats 通知测试"
         let body = L10n.isChinese ? "通知功能正常工作 ✓" : "Notification is working ✓"

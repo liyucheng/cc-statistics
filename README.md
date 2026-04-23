@@ -104,6 +104,16 @@ Most tools only answer this for Claude Code. cc-statistics answers it for all fo
 > ```
 > Slack, Feishu, and DingTalk webhooks all supported.
 
+### 🔗 Git Hook Integration
+> Auto-log AI usage statistics on every Git commit. Tracks instructions, tool calls, duration, code changes, tokens, cost, and commit author:
+> ```bash
+> cc-stats --install-git-hook
+> ```
+> Logs are written in JSON Lines format. View formatted summaries with:
+> ```bash
+> cc-stats --read-log .ai-usage.log
+> ```
+
 ### ⚡ Project Comparison
 > See which projects are consuming the most resources side by side:
 > ```bash

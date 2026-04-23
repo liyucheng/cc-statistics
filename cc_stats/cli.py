@@ -554,6 +554,43 @@ def main(argv: list[str] | None = None) -> None:
         metavar="REPO_PATH",
         help="显示 Git 集成分析：将会话按时间归属到 commit，计算每 commit 的 Token/成本（默认当前目录）",
     )
+    parser.add_argument(
+        "--install-git-hook",
+        action="store_true",
+        help="安装 Git Hook（提交时自动记录 AI 使用统计到日志文件）",
+    )
+    parser.add_argument(
+        "--generate-git-hook",
+        action="store_true",
+        help="生成 Git Hook 脚本内容（输出到 stdout）",
+    )
+    parser.add_argument(
+        "--write-log",
+        metavar="LOG_FILE",
+        help="写入 AI 使用统计到指定日志文件（供 Git Hook 调用）",
+    )
+    parser.add_argument(
+        "--read-log",
+        metavar="LOG_FILE",
+        help="读取并显示 AI 使用统计日志文件",
+    )
+    parser.add_argument(
+        "--log-file",
+        default=".ai-usage.log",
+        metavar="PATH",
+        help="指定日志文件路径（默认 .ai-usage.log）",
+    )
+    parser.add_argument(
+        "--hook-type",
+        choices=["pre-commit", "post-commit"],
+        default="post-commit",
+        help="Git Hook 类型（默认 post-commit）",
+    )
+    parser.add_argument(
+        "--repo",
+        metavar="REPO_PATH",
+        help="Git 仓库路径（供 Git Hook 使用）",
+    )
 
     args = parser.parse_args(argv)
 
@@ -630,6 +667,41 @@ def main(argv: list[str] | None = None) -> None:
 
     if args.git is not None:
         _show_git_integration(args)
+        return
+
+    if args.install_git_hook:
+        from .git_hook import install_git_hook
+        if install_git_hook(log_file_path=args.log_file, hook_type=args.hook_type, repo_path=args.repo):
+            print(f"✅ Git Hook 已安装到 .git/hooks/{args.hook_type}")
+            print(f"   日志文件: {args.log_file}")
+            print(f"   Hook 类型: {args.hook_type}")
+            print("\n   每次提交时会自动记录 AI 使用统计到日志文件")
+        else:
+            print("❌ 安装失败", file=sys.stderr)
+            sys.exit(1)
+        return
+
+    if args.generate_git_hook:
+        from .git_hook import generate_hook_script
+        print(generate_hook_script(log_file_path=args.log_file, hook_type=args.hook_type))
+        return
+
+    if args.write_log:
+        from .git_hook import generate_ai_usage_log
+        if generate_ai_usage_log(
+            log_file_path=args.write_log,
+            repo_path=args.repo,
+            hook_type=args.hook_type,
+        ):
+            print(f"✅ AI 使用统计已写入: {args.write_log}")
+        else:
+            print("❌ 写入失败", file=sys.stderr)
+            sys.exit(1)
+        return
+
+    if args.read_log:
+        from .git_hook import format_ai_usage_log_summary
+        print(format_ai_usage_log_summary(args.read_log))
         return
 
     if args.compare:
